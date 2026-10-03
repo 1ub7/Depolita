@@ -9,6 +9,6 @@ import java.util.List;
 public interface AppRepository extends JpaRepository<App, Long> {
     boolean existsByName(String name);
     List<App> findAllByOrderByCreatedAtDesc();
-    @Query
+    @Query("select a.assignedPort from App a where a.assignedPort is not null")
     List<Integer> findAllAssignedPorts();
 }
