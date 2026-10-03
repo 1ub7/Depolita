@@ -1,6 +1,5 @@
 package Depolita.global.exception;
 
-import ch.qos.logback.core.spi.ErrorCodes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -21,9 +20,9 @@ import java.util.Objects;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ProblemDetail handleCustomException(CustomException e) {
-        ErrorCodes errorCodes = new ErrorCodes();
-        log.warn("[{}] {}", errorCodes.getCode(), e.getMessage());
-        return createProblemDetail(errorCodes, e.getMessage());
+        ErrorCode errorCode = e.getErrorCode();
+        log.warn("[{}] {}", errorCode.getCode(), e.getMessage());
+        return createProblemDetail(errorCode, e.getMessage());
     }
 
     @Override
