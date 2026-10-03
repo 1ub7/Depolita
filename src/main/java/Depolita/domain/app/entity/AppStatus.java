@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum AppStatus {
-    CLONTING("저장소 복제 중"),
+    CLONING("저장소 복제 중"),
     BUILDING("이미지 빌드 중"),
     RUNNING("실행 중"),
     STOPPED("중지됨"),
@@ -14,12 +14,12 @@ public enum AppStatus {
 
     private final String description;
     public boolean isInProgress() {
-        return this == CLONTING || this == BUILDING;
+        return this == CLONING || this == BUILDING;
     }
 
     public boolean canTransitionTo(AppStatus next) {
         return switch (this) {
-            case CLONTING -> next == BUILDING || next == FAILED;
+            case CLONING -> next == BUILDING || next == FAILED;
             case BUILDING -> next == RUNNING || next == FAILED;
             case RUNNING -> next == STOPPED || next == FAILED;
             case STOPPED, FAILED -> false;
