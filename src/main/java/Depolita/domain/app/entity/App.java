@@ -33,26 +33,30 @@ public class App extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer internalPort;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true)
     private Integer assignedPort;
 
     @Column(length = 64)
     private String containerId;
 
     @Enumerated(EnumType.STRING)
-    @Column(unique = false, length = 20)
+    @Column(nullable = false, length = 20)
     private AppStatus status;
 
     @Column(length = FAILURE_REASON_MAX_LENGTH)
     private String failureReason;
 
-    private App(String name, String repositoryUrl, Integer internalPort,
-                Integer assignedPort, String containerId, AppStatus status, String failureReason) {
+    private App(String name, String repositoryUrl, Integer internalPort, Integer assignedPort) {
         this.name = name;
         this.repositoryUrl = repositoryUrl;
         this.internalPort = internalPort;
         this.assignedPort = assignedPort;
-        this.status = status;
+        this.status = AppStatus.CLONING;
+    }
+
+    public static App create(String name, String repositoryUrl,
+                             Integer internalPort, Integer assignedPort) {
+        return new App(name, repositoryUrl, internalPort, assignedPort);
     }
 
     public void startBuilding() {
@@ -66,11 +70,13 @@ public class App extends BaseTimeEntity {
 
     public void stop() {
         changeStatus(AppStatus.STOPPED);
+        releasePort();
     }
 
     public void fail(String reason) {
         changeStatus(AppStatus.FAILED);
         this.failureReason = truncate(reason);
+        releasePort();
     }
 
     private void changeStatus(AppStatus next) {
@@ -79,6 +85,10 @@ public class App extends BaseTimeEntity {
                     "상태 전이 불가: %s -> %s (appId=%d)".formatted(this.status, next, this.id));
         }
         this.status = next;
+    }
+
+    private void releasePort() {
+        this.assignedPort = null;
     }
 
     private String truncate(String reason) {
