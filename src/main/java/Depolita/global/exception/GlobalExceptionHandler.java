@@ -21,7 +21,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ProblemDetail handleCustomException(CustomException e) {
         ErrorCode errorCode = e.getErrorCode();
-        log.warn("[{}] {}", errorCode.getCode(), e.getMessage());
+        log.warn("[{}] {}", errorCode.name(), e.getMessage());
         return createProblemDetail(errorCode, e.getMessage());
     }
 
@@ -37,7 +37,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                         "field", fe.getField(),
                         "reason", Objects.requireNonNullElse(fe.getDefaultMessage(), "")))
                 .toList();
-        log.warn("[{}] validation failed: {}", errorCode.getCode(), errors);
+        log.warn("[{}] validation failed: {}", errorCode.name(), errors);
         ProblemDetail pd = createProblemDetail(errorCode, errorCode.getMessage());
         pd.setProperty("errors", errors);
         return ResponseEntity.status(errorCode.getStatus()).body(pd);
@@ -53,7 +53,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private ProblemDetail createProblemDetail(ErrorCode errorCode, String detail) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(errorCode.getStatus(), detail);
         pd.setTitle(errorCode.name());
-        pd.setProperty("code", errorCode.getCode());
+        pd.setProperty("code", errorCode.name());
         return pd;
     }
 }
