@@ -1,7 +1,10 @@
 package Depolita.account.exception;
 
-public class InvalidRepositoryUrlException extends RuntimeException {
+import Depolita.global.exception.CustomException;
+import Depolita.global.exception.ErrorCode;
+
+public class InvalidRepositoryUrlException extends CustomException {
     public InvalidRepositoryUrlException() {
-        super("올바른 GitHub 저장소 주소가 아닙니다.");
+        super(ErrorCode.INVALID_APP_STATUS);
     }
 }

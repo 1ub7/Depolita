@@ -1,7 +1,10 @@
 package Depolita.account.exception;
 
-public class NotAllowedAccountException extends RuntimeException {
+import Depolita.global.exception.CustomException;
+import Depolita.global.exception.ErrorCode;
+
+public class NotAllowedAccountException extends CustomException {
     public NotAllowedAccountException() {
-        super("허용되지 않은 계정의 저장소입니다.");
+        super(ErrorCode.NOT_ALLOWED_ACCOUNT);
     }
 }
