@@ -1,1 +1,2 @@
-rootProject.name = 'Depolita'
+rootProject.name = 'Depolita-root'
+includeBuild 'server'
