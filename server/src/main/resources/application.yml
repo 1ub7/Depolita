@@ -9,6 +9,7 @@ spring:
 management:
   docker:
     host: npipe:////./pipe/docker_engine
+    # host: unix:///var/run/docker.sock    # EC2 배포 시
   endpoints:
     web:
       exposure:
