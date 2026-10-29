@@ -19,10 +19,6 @@ public enum ErrorCode {
     DOCKERFILE_NOT_FOUND(HttpStatus.BAD_REQUEST, "저장소에 Dockerfile이 없습니다."),
     // Account
     NOT_ALLOWED_ACCOUNT(HttpStatus.FORBIDDEN, "허용되지 않은 GitHub 계정입니다.");
-    // infra
-    GIT_CLONE_FAILED(HttpStatus.BAD_REQUEST, "저장소를 복제할 수 없습니다."),
-    IMAGE_BUILD_FAILED(HttpStatus.BAD_REQUEST, "이미지 빌드에 실패했습니다."),
-    CONTAINER_RUN_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "컨테이너 실행에 실패했습니다."),
 
     private final HttpStatus status;
     private final String message;
