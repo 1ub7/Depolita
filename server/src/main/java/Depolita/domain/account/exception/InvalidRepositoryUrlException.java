@@ -1,4 +1,4 @@
-package Depolita.account.exception;
+package Depolita.domain.account.exception;
 
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;

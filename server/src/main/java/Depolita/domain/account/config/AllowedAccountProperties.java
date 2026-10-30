@@ -1,4 +1,4 @@
-package Depolita.account.config;
+package Depolita.domain.account.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

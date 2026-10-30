@@ -1,6 +1,6 @@
-package Depolita.account.support;
+package Depolita.domain.account.support;
 
-import Depolita.account.exception.InvalidRepositoryUrlException;
+import Depolita.domain.account.exception.InvalidRepositoryUrlException;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

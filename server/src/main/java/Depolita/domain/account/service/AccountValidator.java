@@ -1,8 +1,8 @@
-package Depolita.account.service;
+package Depolita.domain.account.service;
 
-import Depolita.account.config.AllowedAccountProperties;
-import Depolita.account.exception.NotAllowedAccountException;
-import Depolita.account.support.GithubRepository;
+import Depolita.domain.account.config.AllowedAccountProperties;
+import Depolita.domain.account.exception.NotAllowedAccountException;
+import Depolita.domain.account.support.GithubRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
