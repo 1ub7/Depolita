@@ -79,12 +79,22 @@ public class App extends BaseTimeEntity {
         releasePort();
     }
 
-    private void changeStatus(AppStatus next) {
+    public void changeStatus(AppStatus next) {
         if (!this.status.canTransitionTo(next)) {
             throw new IllegalStateException(
                     "상태 전이 불가: %s -> %s (appId=%d)".formatted(this.status, next, this.id));
         }
         this.status = next;
+    }
+
+    public void markRunning(String containerId) {
+        this.containerId = containerId;
+        this.status = AppStatus.RUNNING;
+    }
+
+    public void markFailed(String reason) {
+        this.failureReason = reason;
+        this.status = AppStatus.FAILED;
     }
 
     private void releasePort() {
