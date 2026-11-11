@@ -1,5 +1,6 @@
 package Depolita.domain.app.entity;
 
+import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.global.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -83,9 +84,9 @@ public class App extends BaseTimeEntity {
         return status.isInProgress();
     }
 
-    public void changeStatus(AppStatus next) {
+    private void changeStatus(AppStatus next) {
         if (!this.status.canTransitionTo(next)) {
-            throw new IllegalStateException();
+            throw new InvalidAppStatusException();
         }
         this.status = next;
     }
