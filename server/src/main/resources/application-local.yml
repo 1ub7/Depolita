@@ -14,7 +14,7 @@ spring:
       hibernate:
         format_sql: true
 docker:
-  host: npipe:////./pipe/docker_engine
+  host: ${DOCKER_HOST:npipe:////./pipe/docker_engine}
 
 logging:
   level:

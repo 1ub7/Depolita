@@ -26,7 +26,7 @@ public record AppResponse(
                 app.getStatus(),
                 app.getFailureReason(),
                 app.getCreatedAt(),
-                app.getUpdateAt()
+                app.getUpdatedAt()
         );
     }
 }

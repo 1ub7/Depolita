@@ -5,6 +5,8 @@ import Depolita.domain.app.dto.AppLogResponse;
 import Depolita.domain.app.dto.AppResponse;
 import Depolita.domain.app.service.AppService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,7 +45,7 @@ public class AppController {
 
     @GetMapping("/{appId}/logs")
     public AppLogResponse getLogs(@PathVariable Long appId,
-                                  @RequestParam(defaultValue = "100") int tail) {
+                                  @RequestParam(defaultValue = "100") @Min(1) @Max(1000) int tail) {
         return appService.getLogs(appId, tail);
     }
 

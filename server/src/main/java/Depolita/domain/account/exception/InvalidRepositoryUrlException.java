@@ -5,6 +5,6 @@ import Depolita.global.exception.ErrorCode;
 
 public class InvalidRepositoryUrlException extends CustomException {
     public InvalidRepositoryUrlException() {
-        super(ErrorCode.INVALID_APP_STATUS);
+        super(ErrorCode.INVALID_REPOSITORY_URL);
     }
 }
