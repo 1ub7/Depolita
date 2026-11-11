@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class App extends BaseTimeEntity {
-    private static final int FAILURE_REASON_MAX_LENGTH = 1000;
+    public static final int FAILURE_REASON_MAX_LENGTH = 1000;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
