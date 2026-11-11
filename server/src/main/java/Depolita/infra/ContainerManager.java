@@ -14,7 +14,6 @@ import com.github.dockerjava.api.model.RestartPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.awt.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import com.github.dockerjava.api.model.Frame;
