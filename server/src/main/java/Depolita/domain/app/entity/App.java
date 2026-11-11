@@ -1,5 +1,6 @@
 package Depolita.domain.app.entity;
 
+import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.global.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,7 +19,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class App extends BaseTimeEntity {
-    private static final int FAILURE_REASON_MAX_LENGTH = 1000;
+    public static final int FAILURE_REASON_MAX_LENGTH = 1000;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -79,22 +80,15 @@ public class App extends BaseTimeEntity {
         releasePort();
     }
 
-    public void changeStatus(AppStatus next) {
+    public boolean isInProgress() {
+        return status.isInProgress();
+    }
+
+    private void changeStatus(AppStatus next) {
         if (!this.status.canTransitionTo(next)) {
-            throw new IllegalStateException(
-                    "상태 전이 불가: %s -> %s (appId=%d)".formatted(this.status, next, this.id));
+            throw new InvalidAppStatusException();
         }
         this.status = next;
-    }
-
-    public void markRunning(String containerId) {
-        this.containerId = containerId;
-        this.status = AppStatus.RUNNING;
-    }
-
-    public void markFailed(String reason) {
-        this.failureReason = reason;
-        this.status = AppStatus.FAILED;
     }
 
     private void releasePort() {
