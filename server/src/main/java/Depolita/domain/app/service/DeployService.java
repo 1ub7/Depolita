@@ -5,9 +5,9 @@ import Depolita.domain.app.exception.AppNotFoundException;
 import Depolita.domain.app.exception.DockerfileNotFoundException;
 import Depolita.domain.app.repository.AppRepository;
 import Depolita.global.exception.ErrorCode;
-import Depolita.infra.ContainerManager;
-import Depolita.infra.GitCloner;
-import Depolita.infra.ImageBuilder;
+import Depolita.domain.app.port.ContainerRuntime;
+import Depolita.domain.app.port.ImageBuilder;
+import Depolita.domain.app.port.SourceFetcher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -27,22 +27,22 @@ import java.util.function.Consumer;
 @Service
 public class DeployService {
     private final AppRepository appRepository;
-    private final GitCloner gitCloner;
+    private final SourceFetcher sourceFetcher;
     private final ImageBuilder imageBuilder;
-    private final ContainerManager containerManager;
+    private final ContainerRuntime containerRuntime;
     private final Executor deployExecutor;
     private final TransactionTemplate newTransaction;
 
     public DeployService(AppRepository appRepository,
-                         GitCloner gitCloner,
+                         SourceFetcher sourceFetcher,
                          ImageBuilder imageBuilder,
-                         ContainerManager containerManager,
+                         ContainerRuntime containerRuntime,
                          @Qualifier("deployExecutor") Executor deployExecutor,
                          PlatformTransactionManager transactionManager) {
         this.appRepository = appRepository;
-        this.gitCloner = gitCloner;
+        this.sourceFetcher = sourceFetcher;
         this.imageBuilder = imageBuilder;
-        this.containerManager = containerManager;
+        this.containerRuntime = containerRuntime;
         this.deployExecutor = deployExecutor;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -72,7 +72,7 @@ public class DeployService {
                     .orElseThrow(AppNotFoundException::new);
 
             // 1. Clone (생성 시 상태가 이미 CLONING)
-            workDir = gitCloner.clone(app.getRepositoryUrl());
+            workDir = sourceFetcher.fetch(app.getRepositoryUrl());
             if (!Files.exists(workDir.resolve("Dockerfile"))) {
                 throw new DockerfileNotFoundException();
             }
@@ -82,7 +82,7 @@ public class DeployService {
             imageBuilder.build(workDir, imageTag(appId));
 
             // 3. Run
-            containerId = containerManager.run(
+            containerId = containerRuntime.run(
                     appId,
                     imageTag(appId),
                     "depolita-app-" + appId,
@@ -100,7 +100,7 @@ public class DeployService {
             }
             markFailed(appId, e.getMessage());
         } finally {
-            gitCloner.cleanup(workDir);
+            sourceFetcher.cleanup(workDir);
         }
     }
 
@@ -121,7 +121,7 @@ public class DeployService {
 
     private void removeQuietly(String containerId) {
         try {
-            containerManager.remove(containerId);
+            containerRuntime.remove(containerId);
         } catch (Exception ex) {
             log.error("[deploy] 컨테이너 정리 실패 containerId={}", containerId, ex);
         }

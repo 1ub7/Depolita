@@ -7,9 +7,9 @@ import Depolita.domain.app.service.AppCreatedEvent;
 import Depolita.domain.app.service.DeployService;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
-import Depolita.infra.ContainerManager;
-import Depolita.infra.GitCloner;
-import Depolita.infra.ImageBuilder;
+import Depolita.domain.app.port.ContainerRuntime;
+import Depolita.domain.app.port.ImageBuilder;
+import Depolita.domain.app.port.SourceFetcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,9 +43,9 @@ class DeployServiceTest {
     Path workDir;
 
     private final AppRepository appRepository = mock(AppRepository.class);
-    private final GitCloner gitCloner = mock(GitCloner.class);
+    private final SourceFetcher sourceFetcher = mock(SourceFetcher.class);
     private final ImageBuilder imageBuilder = mock(ImageBuilder.class);
-    private final ContainerManager containerManager = mock(ContainerManager.class);
+    private final ContainerRuntime containerRuntime = mock(ContainerRuntime.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
     private App app;
@@ -57,7 +57,7 @@ class DeployServiceTest {
     }
 
     private DeployService deployService(Executor executor) {
-        return new DeployService(appRepository, gitCloner, imageBuilder, containerManager, executor, txManager);
+        return new DeployService(appRepository, sourceFetcher, imageBuilder, containerRuntime, executor, txManager);
     }
 
     private void deploy() {
@@ -73,41 +73,41 @@ class DeployServiceTest {
     void success() throws IOException {
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(gitCloner.clone(anyString())).thenReturn(workDir);
-        when(containerManager.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
 
         deploy();
 
         assertEquals(AppStatus.RUNNING, app.getStatus());
         assertEquals("c-1", app.getContainerId());
         assertEquals(10001, app.getAssignedPort());
-        verify(gitCloner).cleanup(workDir);
+        verify(sourceFetcher).cleanup(workDir);
     }
 
     @Test
     @DisplayName("clone 실패 → FAILED, 포트 반납, 빌드·실행은 시도하지 않음")
     void cloneFailure() {
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(gitCloner.clone(anyString())).thenThrow(new CustomException(ErrorCode.GIT_CLONE_FAILED));
+        when(sourceFetcher.fetch(anyString())).thenThrow(new CustomException(ErrorCode.GIT_CLONE_FAILED));
 
         deploy();
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertNull(app.getAssignedPort());
-        verifyNoInteractions(imageBuilder, containerManager);
+        verifyNoInteractions(imageBuilder, containerRuntime);
     }
 
     @Test
     @DisplayName("Dockerfile 없음 → FAILED, 복제한 폴더는 정리")
     void dockerfileMissing() {
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(gitCloner.clone(anyString())).thenReturn(workDir); // 빈 폴더
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir); // 빈 폴더
 
         deploy();
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertEquals(ErrorCode.DOCKERFILE_NOT_FOUND.getMessage(), app.getFailureReason());
-        verify(gitCloner).cleanup(workDir);
+        verify(sourceFetcher).cleanup(workDir);
         verifyNoInteractions(imageBuilder);
     }
 
@@ -116,14 +116,14 @@ class DeployServiceTest {
     void buildFailure() throws IOException {
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(gitCloner.clone(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
         when(imageBuilder.build(any(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.IMAGE_BUILD_FAILED, "npm ERR!", new RuntimeException()));
 
         deploy();
 
         assertEquals(AppStatus.FAILED, app.getStatus());
-        verifyNoInteractions(containerManager);
+        verifyNoInteractions(containerRuntime);
     }
 
     @Test
@@ -135,12 +135,12 @@ class DeployServiceTest {
                 .thenReturn(Optional.of(app))
                 .thenThrow(new RuntimeException("DB 연결 끊김"))
                 .thenReturn(Optional.of(app));
-        when(gitCloner.clone(anyString())).thenReturn(workDir);
-        when(containerManager.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
 
         deploy();
 
-        verify(containerManager).remove("c-1");
+        verify(containerRuntime).remove("c-1");
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertNull(app.getAssignedPort());
     }
@@ -157,6 +157,6 @@ class DeployServiceTest {
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertEquals(ErrorCode.DEPLOY_QUEUE_FULL.getMessage(), app.getFailureReason());
-        verify(gitCloner, never()).clone(anyString());
+        verify(sourceFetcher, never()).fetch(anyString());
     }
 }

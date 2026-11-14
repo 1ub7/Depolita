@@ -1,8 +1,8 @@
 package Depolita.domain.app.service;
 
 import Depolita.domain.app.exception.PortExhaustedException;
+import Depolita.domain.app.port.HostPortChecker;
 import Depolita.domain.app.repository.AppRepository;
-import Depolita.infra.HostPortChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

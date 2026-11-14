@@ -4,11 +4,11 @@ import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.repository.AppRepository;
 import Depolita.domain.app.service.AppReconciler;
-import Depolita.infra.ContainerManager;
-import Depolita.infra.ContainerManager.ContainerInspection;
-import Depolita.infra.ContainerManager.ContainerStatus;
-import Depolita.infra.ContainerManager.ManagedContainer;
-import Depolita.infra.ImageBuilder;
+import Depolita.domain.app.port.ContainerRuntime;
+import Depolita.domain.app.port.ContainerRuntime.ContainerInspection;
+import Depolita.domain.app.port.ContainerRuntime.ContainerStatus;
+import Depolita.domain.app.port.ContainerRuntime.ManagedContainer;
+import Depolita.domain.app.port.ImageBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 
 class AppReconcilerTest {
     private final AppRepository appRepository = mock(AppRepository.class);
-    private final ContainerManager containerManager = mock(ContainerManager.class);
+    private final ContainerRuntime containerRuntime = mock(ContainerRuntime.class);
     private final ImageBuilder imageBuilder = mock(ImageBuilder.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
@@ -49,8 +49,8 @@ class AppReconcilerTest {
         when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of());
         when(appRepository.findAll()).thenReturn(List.of());
-        when(containerManager.listManaged()).thenReturn(List.of());
-        reconciler = new AppReconciler(appRepository, containerManager, imageBuilder, txManager);
+        when(containerRuntime.listManaged()).thenReturn(List.of());
+        reconciler = new AppReconciler(appRepository, containerRuntime, imageBuilder, txManager);
     }
 
     private App runningApp(Long id, String containerId) {
@@ -80,13 +80,13 @@ class AppReconcilerTest {
         App app = runningApp(1L, "c-1");
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of(app));
         when(appRepository.findById(1L)).thenReturn(Optional.of(app));
-        when(containerManager.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.MISSING, false, 0));
+        when(containerRuntime.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.MISSING, false, 0));
 
         reconciler.reconcile();
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertNull(app.getAssignedPort());
-        verify(containerManager).remove("c-1");
+        verify(containerRuntime).remove("c-1");
     }
 
     @Test
@@ -97,12 +97,12 @@ class AppReconcilerTest {
         latest.stop();
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of(snapshot));
         when(appRepository.findById(1L)).thenReturn(Optional.of(latest));
-        when(containerManager.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.EXITED, false, 0));
+        when(containerRuntime.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.EXITED, false, 0));
 
         reconciler.reconcile();
 
         assertEquals(AppStatus.STOPPED, latest.getStatus());
-        verify(containerManager, never()).remove("c-1");
+        verify(containerRuntime, never()).remove("c-1");
     }
 
     @Test
@@ -110,17 +110,17 @@ class AppReconcilerTest {
     void orphanOfDeletedApp() {
         App other = runningApp(5L, "c-5");
         when(appRepository.findAll()).thenReturn(List.of(other));
-        when(containerManager.inspect("c-5")).thenReturn(new ContainerInspection(ContainerStatus.RUNNING, false, 0));
-        when(containerManager.listManaged()).thenReturn(List.of(
+        when(containerRuntime.inspect("c-5")).thenReturn(new ContainerInspection(ContainerStatus.RUNNING, false, 0));
+        when(containerRuntime.listManaged()).thenReturn(List.of(
                 new ManagedContainer("c-5", 5L),
                 new ManagedContainer("c-3", 3L)
         ));
 
         reconciler.reconcile();
 
-        verify(containerManager).remove("c-3");
+        verify(containerRuntime).remove("c-3");
         verify(imageBuilder).remove(DeployService.imageTag(3L));
-        verify(containerManager, never()).remove("c-5");
+        verify(containerRuntime, never()).remove("c-5");
     }
 
     @Test
@@ -130,11 +130,11 @@ class AppReconcilerTest {
         ReflectionTestUtils.setField(building, "id", 2L);
         building.startBuilding();
         when(appRepository.findAll()).thenReturn(List.of(building));
-        when(containerManager.listManaged()).thenReturn(List.of(new ManagedContainer("c-2", 2L)));
+        when(containerRuntime.listManaged()).thenReturn(List.of(new ManagedContainer("c-2", 2L)));
 
         reconciler.reconcile();
 
-        verify(containerManager, never()).remove(anyString());
+        verify(containerRuntime, never()).remove(anyString());
     }
 
     @Test
@@ -144,13 +144,13 @@ class AppReconcilerTest {
         app.stop();
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of(app));
         when(appRepository.findAll()).thenReturn(List.of(app));
-        when(containerManager.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.RUNNING, false, 0));
-        when(containerManager.listManaged()).thenReturn(List.of(new ManagedContainer("c-1", 1L)));
+        when(containerRuntime.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.RUNNING, false, 0));
+        when(containerRuntime.listManaged()).thenReturn(List.of(new ManagedContainer("c-1", 1L)));
 
         reconciler.reconcile();
 
-        verify(containerManager).stop("c-1");
-        verify(containerManager, never()).remove("c-1");
+        verify(containerRuntime).stop("c-1");
+        verify(containerRuntime, never()).remove("c-1");
     }
 
     @Test
@@ -158,26 +158,26 @@ class AppReconcilerTest {
     void orphanOfLatestDeletedApp() {
         App older = runningApp(1L, "c-1");
         when(appRepository.findAll()).thenReturn(List.of(older));
-        when(containerManager.listManaged()).thenReturn(List.of(
+        when(containerRuntime.listManaged()).thenReturn(List.of(
                 new ManagedContainer("c-1", 1L),
                 new ManagedContainer("c-2", 2L)
         ));
 
         reconciler.reconcile();
 
-        verify(containerManager).remove("c-2");
+        verify(containerRuntime).remove("c-2");
         verify(imageBuilder).remove(DeployService.imageTag(2L));
-        verify(containerManager, never()).remove("c-1");
+        verify(containerRuntime, never()).remove("c-1");
     }
 
     @Test
     @DisplayName("앱이 하나도 남아 있지 않아도 고아 컨테이너는 정리된다")
     void orphanWhenNoAppsLeft() {
-        when(containerManager.listManaged()).thenReturn(List.of(new ManagedContainer("c-7", 7L)));
+        when(containerRuntime.listManaged()).thenReturn(List.of(new ManagedContainer("c-7", 7L)));
 
         reconciler.reconcile();
 
-        verify(containerManager).remove("c-7");
+        verify(containerRuntime).remove("c-7");
     }
 
     @Test
@@ -185,15 +185,15 @@ class AppReconcilerTest {
     void listsContainersBeforeApps() {
         reconciler.reconcile();
 
-        InOrder inOrder = inOrder(containerManager, appRepository);
-        inOrder.verify(containerManager).listManaged();
+        InOrder inOrder = inOrder(containerRuntime, appRepository);
+        inOrder.verify(containerRuntime).listManaged();
         inOrder.verify(appRepository).findAll();
     }
 
     @Test
     @DisplayName("기동 시 Docker 네이티브 라이브러리 오류가 나도 서버 기동을 막지 않는다")
     void startupSurvivesLinkageError() {
-        when(containerManager.listManaged()).thenThrow(new UnsatisfiedLinkError("docker native lib"));
+        when(containerRuntime.listManaged()).thenThrow(new UnsatisfiedLinkError("docker native lib"));
 
         assertDoesNotThrow(reconciler::onStartup);
     }
@@ -202,10 +202,10 @@ class AppReconcilerTest {
     @DisplayName("서버가 뜨기 전에 멈춘 배포만 FAILED로 바꾼다 (기동 직후 들어온 배포 요청은 건드리지 않음)")
     void failsOnlyDeploymentsInterruptedBeforeStartup() {
         LocalDateTime beforeCreate = LocalDateTime.now();
-        AppReconciler fresh = new AppReconciler(appRepository, containerManager, imageBuilder, txManager);
+        AppReconciler fresh = new AppReconciler(appRepository, containerRuntime, imageBuilder, txManager);
         LocalDateTime afterCreate = LocalDateTime.now();
 
-        App interrupted = App.create("old", "https://github.com/1ub7/demo.git", 8080, 10001); // CLONING
+        App interrupted = App.create("old", "https://github.com/1ub7/demo.git", 8080, 10001);
         when(appRepository.findAllByStatusInAndUpdatedAtBefore(anyCollection(), any()))
                 .thenReturn(List.of(interrupted));
 
