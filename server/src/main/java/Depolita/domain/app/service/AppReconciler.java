@@ -43,7 +43,11 @@ public class AppReconciler {
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         failInterruptedDeployments();
-        reconcile();
+        try {
+            reconcile();
+        } catch (LinkageError e) {
+            log.error("[reconcile] Docker 클라이언트를 초기화할 수 없습니다. DOCKER_HOST와 실행 환경(OS/아키텍처)을 확인하세요.", e);
+        }
     }
 
     @Scheduled(initialDelayString = "${depolita.reconcile-interval-ms:30000}",
@@ -65,7 +69,7 @@ public class AppReconciler {
         try {
             reconcileApps();
             removeOrphanContainers();
-        } catch (Exception | LinkageError e) {
+        } catch (Exception e) {
             log.error("[reconcile] 재조정 실패, 다음 주기에 재시도", e);
         }
     }
@@ -128,15 +132,12 @@ public class AppReconciler {
     }
 
     private void removeOrphanContainers() {
+        List<ManagedContainer> containers = containerManager.listManaged();
         Map<Long, App> apps = appRepository.findAll().stream()
                 .collect(Collectors.toMap(App::getId, Function.identity()));
-        long maxKnownId = apps.keySet().stream().mapToLong(Long::longValue).max().orElse(0L);
 
-        for (ManagedContainer container : containerManager.listManaged()) {
+        for (ManagedContainer container : containers) {
             App app = apps.get(container.appId());
-            if (app == null && container.appId() > maxKnownId) {
-                continue;
-            }
             if (isOwned(app, container.id())) {
                 continue;
             }
