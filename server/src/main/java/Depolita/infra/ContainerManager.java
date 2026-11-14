@@ -4,9 +4,11 @@ import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
@@ -15,19 +17,34 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import com.github.dockerjava.api.model.Frame;
 
 @Component
 @RequiredArgsConstructor
 public class ContainerManager {
+    public static final String APP_ID_LABEL = "depolita.app-id";
+
     private static final long MEMORY_LIMIT = 512L * 1024 * 1024;
     private static final long NANO_CPUS = 500_000_000L;
     private static final int MAX_LOG_TAIL = 1000;
 
     private final DockerClient dockerClient;
 
-    public String run(String image, String name, int hostPort, int containerPort) {
+    public enum ContainerStatus { RUNNING, RESTARTING, EXITED, MISSING }
+
+    public record ContainerInspection(ContainerStatus status, boolean oomKilled, int restartCount) {
+        static ContainerInspection missing() {
+            return new ContainerInspection(ContainerStatus.MISSING, false, 0);
+        }
+    }
+
+    public record ManagedContainer(String id, Long appId) {
+    }
+
+    public String run(Long appId, String image, String name, int hostPort, int containerPort) {
         ExposedPort exposed = ExposedPort.tcp(containerPort);
         HostConfig hostConfig = HostConfig.newHostConfig()
                 .withPortBindings(new PortBinding(Ports.Binding.bindPort(hostPort), exposed))
@@ -40,6 +57,7 @@ public class ContainerManager {
         try {
             containerId = dockerClient.createContainerCmd(image)
                     .withName(name)
+                    .withLabels(Map.of(APP_ID_LABEL, String.valueOf(appId)))
                     .withExposedPorts(exposed)
                     .withHostConfig(hostConfig)
                     .exec()
@@ -66,6 +84,42 @@ public class ContainerManager {
         }
     }
 
+    public ContainerInspection inspect(String containerId) {
+        if (containerId == null) {
+            return ContainerInspection.missing();
+        }
+        try {
+            InspectContainerResponse response = dockerClient.inspectContainerCmd(containerId).exec();
+            InspectContainerResponse.ContainerState state = response.getState();
+            boolean oomKilled = Boolean.TRUE.equals(state.getOOMKilled());
+            int restartCount = Objects.requireNonNullElse(response.getRestartCount(), 0);
+
+            ContainerStatus status;
+            if (Boolean.TRUE.equals(state.getRestarting())) {
+                status = ContainerStatus.RESTARTING; // 재시작 중에는 Running도 true라서 먼저 확인
+            } else if (Boolean.TRUE.equals(state.getRunning())) {
+                status = ContainerStatus.RUNNING;
+            } else {
+                status = ContainerStatus.EXITED;
+            }
+            return new ContainerInspection(status, oomKilled, restartCount);
+        } catch (NotFoundException e) {
+            return ContainerInspection.missing();
+        }
+    }
+
+    /** Depolita 라벨이 붙은 컨테이너 전부 (멈춘 것 포함). */
+    public List<ManagedContainer> listManaged() {
+        return dockerClient.listContainersCmd()
+                .withShowAll(true)
+                .withLabelFilter(List.of(APP_ID_LABEL))
+                .exec()
+                .stream()
+                .map(c -> new ManagedContainer(c.getId(), parseAppId(c.getLabels())))
+                .filter(c -> c.appId() != null)
+                .toList();
+    }
+
     public String getLogs(String containerId, int tail) {
         StringBuffer logs = new StringBuffer();
         try {
@@ -80,9 +134,20 @@ public class ContainerManager {
                         }
                     })
                     .awaitCompletion(5, TimeUnit.SECONDS);
+        } catch (NotFoundException e) {
+            return "";
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
         return logs.toString();
+    }
+
+    private static Long parseAppId(Map<String, String> labels) {
+        if (labels == null) return null;
+        try {
+            return Long.valueOf(labels.get(APP_ID_LABEL));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

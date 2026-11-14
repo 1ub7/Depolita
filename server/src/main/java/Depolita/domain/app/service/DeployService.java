@@ -83,6 +83,7 @@ public class DeployService {
 
             // 3. Run
             containerId = containerManager.run(
+                    appId,
                     imageTag(appId),
                     "depolita-app-" + appId,
                     app.getAssignedPort(),
@@ -94,26 +95,25 @@ public class DeployService {
 
         } catch (Exception e) {
             log.error("[deploy] appId={} FAILED", appId, e);
-            // 컨테이너는 떴는데 상태 저장이 실패한 경우: 포트가 반납되므로 컨테이너도 지워야 충돌이 안 남
             if (containerId != null) {
                 removeQuietly(containerId);
             }
             markFailed(appId, e.getMessage());
         } finally {
-            gitCloner.cleanup(workDir); // null이면 내부에서 무시
+            gitCloner.cleanup(workDir);
         }
     }
 
     private void updateApp(Long appId, Consumer<App> change) {
         newTransaction.executeWithoutResult(status ->
-                appRepository.findById(appId).ifPresent(change) // 배포 중 삭제된 경우 무시
+                appRepository.findById(appId).ifPresent(change)
         );
     }
 
     private void markFailed(Long appId, String reason) {
         String message = (reason == null || reason.isBlank()) ? "알 수 없는 오류" : reason;
         try {
-            updateApp(appId, a -> a.fail(message)); // 길이 제한은 App.fail()이 처리
+            updateApp(appId, a -> a.fail(message));
         } catch (Exception ex) {
             log.error("[deploy] appId={} 실패 상태 기록 불가", appId, ex);
         }
