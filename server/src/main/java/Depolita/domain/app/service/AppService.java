@@ -10,6 +10,7 @@ import Depolita.domain.app.exception.AppNotFoundException;
 import Depolita.domain.app.exception.DuplicateAppNameException;
 import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.domain.app.repository.AppRepository;
+import Depolita.global.config.DepolitaProperties;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import Depolita.infra.ContainerManager;
@@ -39,7 +40,7 @@ public class AppService {
     private final ImageBuilder imageBuilder;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
-
+    private final DepolitaProperties properties;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AppResponse create(AppCreateRequest request) {
@@ -69,19 +70,20 @@ public class AppService {
                 portAllocator.allocate()
         ));
         eventPublisher.publishEvent(new AppCreatedEvent(app.getId()));
-        return AppResponse.from(app);
+        return toResponse(app);
     }
 
     public List<AppResponse> getApps() {
         return appRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(AppResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     public AppResponse getApp(Long appId) {
-        return AppResponse.from(findApp(appId));
+        return toResponse(findApp(appId));
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AppLogResponse getLogs(Long appId, int tail) {
         App app = findApp(appId);
         if (app.getContainerId() == null) {
@@ -92,29 +94,48 @@ public class AppService {
         return AppLogResponse.of(appId, logs.lines().toList());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AppResponse stop(Long appId) {
-        App app = findApp(appId);
-        app.stop(); // RUNNING이 아니면 InvalidAppStatusException, 포트도 여기서 반납
-        containerManager.stop(app.getContainerId()); // 실패하면 예외 → 트랜잭션 롤백으로 상태도 되돌아감
-        return AppResponse.from(app);
+        App app = transactionTemplate.execute(status -> {
+            App found = findApp(appId);
+            found.stop();
+            return found;
+        });
+
+        try {
+            containerManager.stop(app.getContainerId());
+        } catch (Exception e) {
+            log.warn("[stop] appId={} 컨테이너 중지 실패, 재조정 루프가 다시 시도합니다", appId, e);
+        }
+        return toResponse(app);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void delete(Long appId) {
-        App app = findApp(appId);
-        if (app.isInProgress()) {
-            throw new InvalidAppStatusException();
+        String containerId = transactionTemplate.execute(status -> {
+            App app = findApp(appId);
+            if (app.isInProgress()) {
+                throw new InvalidAppStatusException();
+            }
+            appRepository.delete(app);
+            return app.getContainerId();
+        });
+        try {
+            if (containerId != null) {
+                containerManager.remove(containerId);
+            }
+            imageBuilder.remove(DeployService.imageTag(appId));
+        } catch (Exception e) {
+            log.warn("[delete] appId={} Docker 리소스 정리 실패, 재조정 루프가 정리합니다", appId, e);
         }
-        if (app.getContainerId() != null) {
-            containerManager.remove(app.getContainerId());
-        }
-        imageBuilder.remove(DeployService.imageTag(appId));
-        appRepository.delete(app);
     }
 
     private App findApp(Long appId) {
         return appRepository.findById(appId)
                 .orElseThrow(AppNotFoundException::new);
+    }
+
+    private AppResponse toResponse(App app) {
+        return AppResponse.from(app, properties.publicHost());
     }
 }
