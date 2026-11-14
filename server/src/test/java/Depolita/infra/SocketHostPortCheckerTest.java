@@ -9,8 +9,8 @@ import java.net.ServerSocket;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class HostPortCheckerTest {
-    private final HostPortChecker checker = new HostPortChecker();
+class SocketHostPortCheckerTest {
+    private final SocketHostPortChecker checker = new SocketHostPortChecker();
 
     @Test
     @DisplayName("다른 프로세스가 열어 둔 포트는 사용할 수 없다고 판단한다")

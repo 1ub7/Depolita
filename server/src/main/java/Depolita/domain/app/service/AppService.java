@@ -9,12 +9,12 @@ import Depolita.domain.app.entity.App;
 import Depolita.domain.app.exception.AppNotFoundException;
 import Depolita.domain.app.exception.DuplicateAppNameException;
 import Depolita.domain.app.exception.InvalidAppStatusException;
+import Depolita.domain.app.port.ContainerRuntime;
+import Depolita.domain.app.port.ImageBuilder;
 import Depolita.domain.app.repository.AppRepository;
 import Depolita.global.config.DepolitaProperties;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
-import Depolita.infra.ContainerManager;
-import Depolita.infra.ImageBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,7 +37,7 @@ public class AppService {
     private final AppRepository appRepository;
     private final AccountValidator accountValidator;
     private final PortAllocator portAllocator;
-    private final ContainerManager containerManager;
+    private final ContainerRuntime containerRuntime;
     private final ImageBuilder imageBuilder;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
@@ -77,7 +77,7 @@ public class AppService {
 
     private Set<Integer> usedHostPorts() {
         try {
-            return containerManager.usedHostPorts();
+            return containerRuntime.usedHostPorts();
         } catch (Exception e) {
             log.warn("[create] Docker 포트 조회 실패, DB 기준으로만 포트를 고릅니다", e);
             return Set.of();
@@ -101,7 +101,7 @@ public class AppService {
             String reason = app.getFailureReason();
             return AppLogResponse.of(appId, reason == null ? List.of() : List.of(reason));
         }
-        String logs = containerManager.getLogs(app.getContainerId(), tail);
+        String logs = containerRuntime.getLogs(app.getContainerId(), tail);
         return AppLogResponse.of(appId, logs.lines().toList());
     }
 
@@ -114,7 +114,7 @@ public class AppService {
         });
 
         try {
-            containerManager.stop(app.getContainerId());
+            containerRuntime.stop(app.getContainerId());
         } catch (Exception e) {
             log.warn("[stop] appId={} 컨테이너 중지 실패, 재조정 루프가 다시 시도합니다", appId, e);
         }
@@ -133,7 +133,7 @@ public class AppService {
         });
         try {
             if (containerId != null) {
-                containerManager.remove(containerId);
+                containerRuntime.remove(containerId);
             }
             imageBuilder.remove(DeployService.imageTag(appId));
         } catch (Exception e) {

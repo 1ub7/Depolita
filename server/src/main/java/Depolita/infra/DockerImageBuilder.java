@@ -1,5 +1,6 @@
 package Depolita.infra;
 
+import Depolita.domain.app.port.ImageBuilder;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import com.github.dockerjava.api.DockerClient;
@@ -15,10 +16,11 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
-public class ImageBuilder {
+public class DockerImageBuilder implements ImageBuilder {
     private static final int LOG_TAIL_LENGTH = 300;
     private final DockerClient dockerClient;
 
+    @Override
     public String build(Path contextDir, String tag) {
         StringBuffer logs = new StringBuffer();
         try {
@@ -37,6 +39,7 @@ public class ImageBuilder {
         }
     }
 
+    @Override
     public void remove(String tag) {
         try {
             dockerClient.removeImageCmd(tag).withForce(true).exec();

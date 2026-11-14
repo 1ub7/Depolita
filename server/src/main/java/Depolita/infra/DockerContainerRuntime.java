@@ -1,5 +1,6 @@
 package Depolita.infra;
 
+import Depolita.domain.app.port.ContainerRuntime;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import com.github.dockerjava.api.DockerClient;
@@ -29,7 +30,7 @@ import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
-public class ContainerManager {
+public class DockerContainerRuntime implements ContainerRuntime {
     public static final String APP_ID_LABEL = "depolita.app-id";
 
     private static final long MEMORY_LIMIT = 512L * 1024 * 1024;
@@ -38,17 +39,7 @@ public class ContainerManager {
 
     private final DockerClient dockerClient;
 
-    public enum ContainerStatus { RUNNING, RESTARTING, EXITED, MISSING }
-
-    public record ContainerInspection(ContainerStatus status, boolean oomKilled, int restartCount) {
-        static ContainerInspection missing() {
-            return new ContainerInspection(ContainerStatus.MISSING, false, 0);
-        }
-    }
-
-    public record ManagedContainer(String id, Long appId) {
-    }
-
+    @Override
     public String run(Long appId, String image, String name, int hostPort, int containerPort) {
         ExposedPort exposed = ExposedPort.tcp(containerPort);
         HostConfig hostConfig = HostConfig.newHostConfig()
@@ -75,6 +66,7 @@ public class ContainerManager {
         }
     }
 
+    @Override
     public void stop(String containerId) {
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(10).exec();
@@ -82,6 +74,7 @@ public class ContainerManager {
         }
     }
 
+    @Override
     public void remove(String containerId) {
         try {
             dockerClient.removeContainerCmd(containerId).withForce(true).exec();
@@ -89,6 +82,7 @@ public class ContainerManager {
         }
     }
 
+    @Override
     public ContainerInspection inspect(String containerId) {
         if (containerId == null) {
             return ContainerInspection.missing();
@@ -113,6 +107,7 @@ public class ContainerManager {
         }
     }
 
+    @Override
     public List<ManagedContainer> listManaged() {
         return dockerClient.listContainersCmd()
                 .withShowAll(true)
@@ -124,6 +119,7 @@ public class ContainerManager {
                 .toList();
     }
 
+    @Override
     public Set<Integer> usedHostPorts() {
         return dockerClient.listContainersCmd()
                 .exec()
@@ -134,6 +130,7 @@ public class ContainerManager {
                 .collect(Collectors.toSet());
     }
 
+    @Override
     public String getLogs(String containerId, int tail) {
         StringBuffer logs = new StringBuffer();
         try {

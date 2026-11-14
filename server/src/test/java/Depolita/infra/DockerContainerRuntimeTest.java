@@ -15,9 +15,9 @@ import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class ContainerManagerTest {
+class DockerContainerRuntimeTest {
     private final DockerClient dockerClient = mock(DockerClient.class);
-    private final ContainerManager containerManager = new ContainerManager(dockerClient);
+    private final DockerContainerRuntime runtime = new DockerContainerRuntime(dockerClient);
 
     private void givenStopThrows(RuntimeException e) {
         StopContainerCmd cmd = mock(StopContainerCmd.class, RETURNS_SELF);
@@ -30,7 +30,7 @@ class ContainerManagerTest {
     void stopMissingContainer() {
         givenStopThrows(new NotFoundException("No such container: c-1"));
 
-        assertDoesNotThrow(() -> containerManager.stop("c-1"));
+        assertDoesNotThrow(() -> runtime.stop("c-1"));
     }
 
     @Test
@@ -38,7 +38,7 @@ class ContainerManagerTest {
     void stopAlreadyStoppedContainer() {
         givenStopThrows(new NotModifiedException("Container already stopped"));
 
-        assertDoesNotThrow(() -> containerManager.stop("c-1"));
+        assertDoesNotThrow(() -> runtime.stop("c-1"));
     }
 
     @Test
@@ -48,6 +48,6 @@ class ContainerManagerTest {
         when(cmd.exec(any())).thenThrow(new NotFoundException("No such container: c-1"));
         when(dockerClient.logContainerCmd("c-1")).thenReturn(cmd);
 
-        assertEquals("", containerManager.getLogs("c-1", 100));
+        assertEquals("", runtime.getLogs("c-1", 100));
     }
 }

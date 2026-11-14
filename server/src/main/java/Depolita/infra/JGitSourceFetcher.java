@@ -1,10 +1,10 @@
 package Depolita.infra;
 
+import Depolita.domain.app.port.SourceFetcher;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.api.Git;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -12,8 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Component
-public class GitCloner {
-    public Path clone(String repoUrl) {
+public class JGitSourceFetcher implements SourceFetcher {
+    @Override
+    public Path fetch(String repoUrl) {
         Path dir = null;
         try {
             dir = Files.createTempDirectory("depolita-");
@@ -30,6 +31,7 @@ public class GitCloner {
         }
     }
 
+    @Override
     public void cleanup(Path dir) {
         if (dir == null) return;
         try {

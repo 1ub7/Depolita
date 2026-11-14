@@ -3,10 +3,11 @@ package Depolita.domain.app.service;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.repository.AppRepository;
-import Depolita.infra.ContainerManager;
-import Depolita.infra.ContainerManager.ContainerInspection;
-import Depolita.infra.ContainerManager.ManagedContainer;
-import Depolita.infra.ImageBuilder;
+import Depolita.domain.app.port.ContainerRuntime;
+import Depolita.domain.app.port.ContainerRuntime.ContainerInspection;
+import Depolita.domain.app.port.ContainerRuntime.ContainerStatus;
+import Depolita.domain.app.port.ContainerRuntime.ManagedContainer;
+import Depolita.domain.app.port.ImageBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -27,17 +28,17 @@ public class AppReconciler {
     static final int CRASH_LOOP_THRESHOLD = 5;
 
     private final AppRepository appRepository;
-    private final ContainerManager containerManager;
+    private final ContainerRuntime containerRuntime;
     private final ImageBuilder imageBuilder;
     private final TransactionTemplate tx;
     private final LocalDateTime startedAt;
 
     public AppReconciler(AppRepository appRepository,
-                         ContainerManager containerManager,
+                         ContainerRuntime containerRuntime,
                          ImageBuilder imageBuilder,
                          PlatformTransactionManager transactionManager) {
         this.appRepository = appRepository;
-        this.containerManager = containerManager;
+        this.containerRuntime = containerRuntime;
         this.imageBuilder = imageBuilder;
         this.tx = new TransactionTemplate(transactionManager);
         this.startedAt = LocalDateTime.now();
@@ -94,7 +95,7 @@ public class AppReconciler {
     }
 
     private void reconcileRunning(Long appId, String containerId) {
-        String reason = failureReason(containerManager.inspect(containerId));
+        String reason = failureReason(containerRuntime.inspect(containerId));
         if (reason == null) {
             return;
         }
@@ -107,17 +108,17 @@ public class AppReconciler {
                 .orElse(false));
         if (Boolean.TRUE.equals(failed)) {
             if (containerId != null) {
-                containerManager.remove(containerId);
+                containerRuntime.remove(containerId);
             }
             log.warn("[reconcile] appId={} RUNNING → FAILED: {}", appId, reason);
         }
     }
 
     private void reconcileStopped(Long appId, String containerId) {
-        ContainerManager.ContainerStatus actual = containerManager.inspect(containerId).status();
-        if (actual == ContainerManager.ContainerStatus.RUNNING
-                || actual == ContainerManager.ContainerStatus.RESTARTING) {
-            containerManager.stop(containerId);
+        ContainerStatus actual = containerRuntime.inspect(containerId).status();
+        if (actual == ContainerStatus.RUNNING
+                || actual == ContainerStatus.RESTARTING) {
+            containerRuntime.stop(containerId);
             log.warn("[reconcile] appId={} STOPPED인데 컨테이너가 실행 중이라 다시 중지", appId);
         }
     }
@@ -136,7 +137,7 @@ public class AppReconciler {
     }
 
     private void removeOrphanContainers() {
-        List<ManagedContainer> containers = containerManager.listManaged();
+        List<ManagedContainer> containers = containerRuntime.listManaged();
         Map<Long, App> apps = appRepository.findAll().stream()
                 .collect(Collectors.toMap(App::getId, Function.identity()));
 
@@ -146,7 +147,7 @@ public class AppReconciler {
                 continue;
             }
             try {
-                containerManager.remove(container.id());
+                containerRuntime.remove(container.id());
                 if (app == null) {
                     imageBuilder.remove(DeployService.imageTag(container.appId()));
                 }
