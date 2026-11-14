@@ -51,7 +51,6 @@ public class AppReconciler {
     public void scheduledReconcile() {
         reconcile();
     }
-
     void failInterruptedDeployments() {
         tx.executeWithoutResult(status -> {
             List<App> stuck = appRepository.findAllByStatusIn(List.of(AppStatus.CLONING, AppStatus.BUILDING));
@@ -66,7 +65,7 @@ public class AppReconciler {
         try {
             reconcileApps();
             removeOrphanContainers();
-        } catch (Exception e) {
+        } catch (Exception | LinkageError e) {
             log.error("[reconcile] 재조정 실패, 다음 주기에 재시도", e);
         }
     }
