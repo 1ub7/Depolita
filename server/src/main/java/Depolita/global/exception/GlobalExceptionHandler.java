@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.List;
@@ -39,12 +40,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpHeaders headers,
             HttpStatusCode status,
             WebRequest request) {
-        ErrorCode errorCode = ErrorCode.INVALID_INPUT;
         List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> Map.of(
                         "field", fe.getField(),
                         "reason", Objects.requireNonNullElse(fe.getDefaultMessage(), "")))
                 .toList();
+        return invalidInput(errors);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+        List<Map<String, String>> errors = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> Map.of(
+                                "field", Objects.requireNonNullElse(result.getMethodParameter().getParameterName(), ""),
+                                "reason", Objects.requireNonNullElse(error.getDefaultMessage(), ""))))
+                .toList();
+        return invalidInput(errors);
+    }
+
+    private ResponseEntity<Object> invalidInput(List<Map<String, String>> errors) {
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT;
         log.warn("[{}] validation failed: {}", errorCode.name(), errors);
         ProblemDetail pd = createProblemDetail(errorCode, errorCode.getMessage());
         pd.setProperty("errors", errors);
