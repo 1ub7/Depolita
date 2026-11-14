@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -45,10 +46,11 @@ public class AppService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AppResponse create(AppCreateRequest request) {
         GithubRepository repository = accountValidator.validate(request.repositoryUrl());
+        Set<Integer> inUseOnHost = usedHostPorts();
 
         for (int attempt = 1; attempt <= MAX_CREATE_ATTEMPTS; attempt++) {
             try {
-                return transactionTemplate.execute(status -> save(request, repository));
+                return transactionTemplate.execute(status -> save(request, repository, inUseOnHost));
             } catch (DataIntegrityViolationException e) {
                 if (appRepository.existsByName(request.name())) {
                     throw new DuplicateAppNameException();
@@ -59,7 +61,7 @@ public class AppService {
         throw new CustomException(ErrorCode.PORT_ALLOCATION_CONFLICT);
     }
 
-    private AppResponse save(AppCreateRequest request, GithubRepository repository) {
+    private AppResponse save(AppCreateRequest request, GithubRepository repository, Set<Integer> inUseOnHost) {
         if (appRepository.existsByName(request.name())) {
             throw new DuplicateAppNameException();
         }
@@ -67,10 +69,19 @@ public class AppService {
                 request.name(),
                 repository.cloneUrl(),
                 request.internalPort(),
-                portAllocator.allocate()
+                portAllocator.allocate(inUseOnHost)
         ));
         eventPublisher.publishEvent(new AppCreatedEvent(app.getId()));
         return toResponse(app);
+    }
+
+    private Set<Integer> usedHostPorts() {
+        try {
+            return containerManager.usedHostPorts();
+        } catch (Exception e) {
+            log.warn("[create] Docker 포트 조회 실패, DB 기준으로만 포트를 고릅니다", e);
+            return Set.of();
+        }
     }
 
     public List<AppResponse> getApps() {

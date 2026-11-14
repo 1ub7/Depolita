@@ -12,6 +12,7 @@ import Depolita.infra.ImageBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -19,12 +20,14 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -145,5 +148,50 @@ class AppReconcilerTest {
 
         verify(containerManager).stop("c-1");
         verify(containerManager, never()).remove("c-1");
+    }
+
+    @Test
+    @DisplayName("가장 최근에 만든 앱을 삭제해도 그 컨테이너는 고아로 정리된다")
+    void orphanOfLatestDeletedApp() {
+        App older = runningApp(1L, "c-1");
+        when(appRepository.findAll()).thenReturn(List.of(older));
+        when(containerManager.listManaged()).thenReturn(List.of(
+                new ManagedContainer("c-1", 1L),
+                new ManagedContainer("c-2", 2L) // 가장 최근 앱(id 2)은 이미 삭제됨
+        ));
+
+        reconciler.reconcile();
+
+        verify(containerManager).remove("c-2");
+        verify(imageBuilder).remove(DeployService.imageTag(2L));
+        verify(containerManager, never()).remove("c-1");
+    }
+
+    @Test
+    @DisplayName("앱이 하나도 남아 있지 않아도 고아 컨테이너는 정리된다")
+    void orphanWhenNoAppsLeft() {
+        when(containerManager.listManaged()).thenReturn(List.of(new ManagedContainer("c-7", 7L)));
+
+        reconciler.reconcile();
+
+        verify(containerManager).remove("c-7");
+    }
+
+    @Test
+    @DisplayName("컨테이너 목록을 DB보다 먼저 읽는다 (새로 만든 앱을 고아로 오판하지 않기 위해)")
+    void listsContainersBeforeApps() {
+        reconciler.reconcile();
+
+        InOrder inOrder = inOrder(containerManager, appRepository);
+        inOrder.verify(containerManager).listManaged();
+        inOrder.verify(appRepository).findAll();
+    }
+
+    @Test
+    @DisplayName("기동 시 Docker 네이티브 라이브러리 오류가 나도 서버 기동을 막지 않는다")
+    void startupSurvivesLinkageError() {
+        when(containerManager.listManaged()).thenThrow(new UnsatisfiedLinkError("docker native lib"));
+
+        assertDoesNotThrow(reconciler::onStartup);
     }
 }

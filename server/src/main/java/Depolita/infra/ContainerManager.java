@@ -7,6 +7,7 @@ import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.exception.NotModifiedException;
+import com.github.dockerjava.api.model.ContainerPort;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
@@ -17,10 +18,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -108,7 +113,6 @@ public class ContainerManager {
         }
     }
 
-    /** Depolita 라벨이 붙은 컨테이너 전부 (멈춘 것 포함). */
     public List<ManagedContainer> listManaged() {
         return dockerClient.listContainersCmd()
                 .withShowAll(true)
@@ -118,6 +122,16 @@ public class ContainerManager {
                 .map(c -> new ManagedContainer(c.getId(), parseAppId(c.getLabels())))
                 .filter(c -> c.appId() != null)
                 .toList();
+    }
+
+    public Set<Integer> usedHostPorts() {
+        return dockerClient.listContainersCmd() // showAll=false → 실행 중인 컨테이너만 (멈춘 컨테이너는 포트를 잡지 않음)
+                .exec()
+                .stream()
+                .flatMap(c -> c.getPorts() == null ? Stream.<ContainerPort>empty() : Arrays.stream(c.getPorts()))
+                .map(ContainerPort::getPublicPort)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     public String getLogs(String containerId, int tail) {

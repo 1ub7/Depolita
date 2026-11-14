@@ -16,8 +16,9 @@ public class PortAllocator {
 
     private final AppRepository appRepository;
 
-    public synchronized int allocate() {
+    public int allocate(Set<Integer> inUseOnHost) {
         Set<Integer> used = new HashSet<>(appRepository.findAllAssignedPorts());
+        used.addAll(inUseOnHost);
         for (int port = MIN_PORT; port <= MAX_PORT; port++) {
             if (!used.contains(port)) {
                 return port;
