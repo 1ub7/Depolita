@@ -78,7 +78,7 @@ public class ContainerManager {
     public void stop(String containerId) {
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(10).exec();
-        } catch (NotModifiedException ignored) {
+        } catch (NotModifiedException | NotFoundException ignored) {
         }
     }
 
@@ -101,7 +101,7 @@ public class ContainerManager {
 
             ContainerStatus status;
             if (Boolean.TRUE.equals(state.getRestarting())) {
-                status = ContainerStatus.RESTARTING; // 재시작 중에는 Running도 true라서 먼저 확인
+                status = ContainerStatus.RESTARTING;
             } else if (Boolean.TRUE.equals(state.getRunning())) {
                 status = ContainerStatus.RUNNING;
             } else {
@@ -125,7 +125,7 @@ public class ContainerManager {
     }
 
     public Set<Integer> usedHostPorts() {
-        return dockerClient.listContainersCmd() // showAll=false → 실행 중인 컨테이너만 (멈춘 컨테이너는 포트를 잡지 않음)
+        return dockerClient.listContainersCmd()
                 .exec()
                 .stream()
                 .flatMap(c -> c.getPorts() == null ? Stream.<ContainerPort>empty() : Arrays.stream(c.getPorts()))
