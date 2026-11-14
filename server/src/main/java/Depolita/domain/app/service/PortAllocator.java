@@ -2,6 +2,7 @@ package Depolita.domain.app.service;
 
 import Depolita.domain.app.exception.PortExhaustedException;
 import Depolita.domain.app.repository.AppRepository;
+import Depolita.infra.HostPortChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +16,13 @@ public class PortAllocator {
     private static final int MAX_PORT = 10999;
 
     private final AppRepository appRepository;
+    private final HostPortChecker hostPortChecker;
 
     public int allocate(Set<Integer> inUseOnHost) {
         Set<Integer> used = new HashSet<>(appRepository.findAllAssignedPorts());
         used.addAll(inUseOnHost);
         for (int port = MIN_PORT; port <= MAX_PORT; port++) {
-            if (!used.contains(port)) {
+            if (!used.contains(port) && hostPortChecker.isAvailable(port)) {
                 return port;
             }
         }
