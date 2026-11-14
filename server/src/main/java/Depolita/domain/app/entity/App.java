@@ -10,9 +10,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "apps")
@@ -41,11 +44,16 @@ public class App extends BaseTimeEntity {
     private String containerId;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private AppStatus status;
 
     @Column(length = FAILURE_REASON_MAX_LENGTH)
     private String failureReason;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     private App(String name, String repositoryUrl, Integer internalPort, Integer assignedPort) {
         this.name = name;

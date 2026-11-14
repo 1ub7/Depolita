@@ -11,6 +11,11 @@ docker:
 
 allowed-accounts: ${ALLOWED_ACCOUNTS:}
 
+depolita:
+  api-key: ${DEPOLITA_API_KEY:}
+  public-host: ${PUBLIC_HOST:localhost}
+  reconcile-interval-ms: ${RECONCILE_INTERVAL_MS:30000}
+
 management:
   endpoints:
     web:
