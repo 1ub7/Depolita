@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -29,6 +30,7 @@ public class AppReconciler {
     private final ContainerManager containerManager;
     private final ImageBuilder imageBuilder;
     private final TransactionTemplate tx;
+    private final LocalDateTime startedAt;
 
     public AppReconciler(AppRepository appRepository,
                          ContainerManager containerManager,
@@ -38,6 +40,7 @@ public class AppReconciler {
         this.containerManager = containerManager;
         this.imageBuilder = imageBuilder;
         this.tx = new TransactionTemplate(transactionManager);
+        this.startedAt = LocalDateTime.now();
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -57,7 +60,8 @@ public class AppReconciler {
     }
     void failInterruptedDeployments() {
         tx.executeWithoutResult(status -> {
-            List<App> stuck = appRepository.findAllByStatusIn(List.of(AppStatus.CLONING, AppStatus.BUILDING));
+            List<App> stuck = appRepository.findAllByStatusInAndUpdatedAtBefore(
+                    List.of(AppStatus.CLONING, AppStatus.BUILDING), startedAt);
             stuck.forEach(app -> app.fail("서버 재시작으로 배포가 중단되었습니다. 다시 배포해주세요."));
             if (!stuck.isEmpty()) {
                 log.warn("[reconcile] 중단된 배포 {}건을 FAILED로 변경", stuck.size());
