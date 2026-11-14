@@ -1,6 +1,7 @@
 package Depolita.global.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -23,6 +24,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         log.warn("[{}] {}", errorCode.name(), e.getMessage());
         return createProblemDetail(errorCode, e.getMessage());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException e) {
+        ErrorCode errorCode = ErrorCode.CONCURRENT_MODIFICATION;
+        log.warn("[{}] {}", errorCode.name(), e.getMessage());
+        return createProblemDetail(errorCode, errorCode.getMessage());
     }
 
     @Override
