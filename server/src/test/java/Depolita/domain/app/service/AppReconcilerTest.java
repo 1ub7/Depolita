@@ -12,16 +12,19 @@ import Depolita.infra.ImageBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,7 +94,7 @@ class AppReconcilerTest {
     void userStoppedInBetween() {
         App snapshot = runningApp(1L, "c-1");
         App latest = runningApp(1L, "c-1");
-        latest.stop(); // 재조정 루프가 다시 읽었을 때는 이미 STOPPED
+        latest.stop();
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of(snapshot));
         when(appRepository.findById(1L)).thenReturn(Optional.of(latest));
         when(containerManager.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.EXITED, false, 0));
@@ -110,7 +113,7 @@ class AppReconcilerTest {
         when(containerManager.inspect("c-5")).thenReturn(new ContainerInspection(ContainerStatus.RUNNING, false, 0));
         when(containerManager.listManaged()).thenReturn(List.of(
                 new ManagedContainer("c-5", 5L),
-                new ManagedContainer("c-3", 3L) // id 3은 DB에 없음
+                new ManagedContainer("c-3", 3L)
         ));
 
         reconciler.reconcile();
@@ -157,7 +160,7 @@ class AppReconcilerTest {
         when(appRepository.findAll()).thenReturn(List.of(older));
         when(containerManager.listManaged()).thenReturn(List.of(
                 new ManagedContainer("c-1", 1L),
-                new ManagedContainer("c-2", 2L) // 가장 최근 앱(id 2)은 이미 삭제됨
+                new ManagedContainer("c-2", 2L)
         ));
 
         reconciler.reconcile();
@@ -193,5 +196,25 @@ class AppReconcilerTest {
         when(containerManager.listManaged()).thenThrow(new UnsatisfiedLinkError("docker native lib"));
 
         assertDoesNotThrow(reconciler::onStartup);
+    }
+
+    @Test
+    @DisplayName("서버가 뜨기 전에 멈춘 배포만 FAILED로 바꾼다 (기동 직후 들어온 배포 요청은 건드리지 않음)")
+    void failsOnlyDeploymentsInterruptedBeforeStartup() {
+        LocalDateTime beforeCreate = LocalDateTime.now();
+        AppReconciler fresh = new AppReconciler(appRepository, containerManager, imageBuilder, txManager);
+        LocalDateTime afterCreate = LocalDateTime.now();
+
+        App interrupted = App.create("old", "https://github.com/1ub7/demo.git", 8080, 10001); // CLONING
+        when(appRepository.findAllByStatusInAndUpdatedAtBefore(anyCollection(), any()))
+                .thenReturn(List.of(interrupted));
+
+        fresh.failInterruptedDeployments();
+
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(appRepository).findAllByStatusInAndUpdatedAtBefore(anyCollection(), cutoff.capture());
+        assertFalse(cutoff.getValue().isBefore(beforeCreate));
+        assertFalse(cutoff.getValue().isAfter(afterCreate));
+        assertEquals(AppStatus.FAILED, interrupted.getStatus());
     }
 }
