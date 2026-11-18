@@ -17,5 +17,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  web:
+    build: ./web
+    container_name: depolita_web
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://host.docker.internal:8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${WEB_PORT:-3000}:8080"
+    restart: unless-stopped
+
 volumes:
   mysql-data:

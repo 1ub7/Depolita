@@ -1,0 +1,45 @@
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    server_tokens off;
+
+    # 주의: 하위 location 에 add_header 가 하나라도 있으면 여기 헤더는 상속되지 않는다.
+    # 그래서 add_header 를 쓰는 location 마다 같은 파일을 다시 include 한다.
+    include /etc/nginx/snippets/security-headers.conf;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # 컨테이너 헬스체크용
+    location = /healthz {
+        access_log off;
+        return 200 "ok";
+    }
+
+    # 프론트와 API 를 같은 출처로 묶는다 → 브라우저 CORS 문제 없음
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # 파일명에 해시가 붙은 빌드 결과물은 1년 캐시
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri =404;
+    }
+
+    # SPA: 없는 경로는 index.html 로 (새로고침해도 /apps/1 이 열리게)
+    location / {
+        add_header Cache-Control "no-cache";
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri $uri/ /index.html;
+    }
+}
