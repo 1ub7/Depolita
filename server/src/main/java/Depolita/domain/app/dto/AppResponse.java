@@ -3,7 +3,10 @@ package Depolita.domain.app.dto;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 
 public record AppResponse(
         Long id,
@@ -37,5 +40,12 @@ public record AppResponse(
             return null;
         }
         return "http://" + publicHost + ":" + app.getAssignedPort();
+    }
+
+    private static Instant toInstant(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+        return time.atZone(ZoneId.systemDefault()).toInstant().truncatedTo(ChronoUnit.MILLIS);
     }
 }
