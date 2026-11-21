@@ -17,8 +17,8 @@ public record AppResponse(
         String url,
         AppStatus status,
         String failureReason,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
     public static AppResponse from(App app, String publicHost) {
         return new AppResponse(
@@ -30,8 +30,8 @@ public record AppResponse(
                 accessUrl(app, publicHost),
                 app.getStatus(),
                 app.getFailureReason(),
-                app.getCreatedAt(),
-                app.getUpdatedAt()
+                toInstant(app.getCreatedAt()),
+                toInstant(app.getUpdatedAt())
         );
     }
 
