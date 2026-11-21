@@ -6,6 +6,9 @@ spring:
   jpa:
     open-in-view: false
 
+server:
+  forward-headers-strategy: native
+
 docker:
   host: ${DOCKER_HOST:unix:///var/run/docker.sock}
 
