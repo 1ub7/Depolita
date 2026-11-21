@@ -13,7 +13,9 @@ export type App = {
   url: string | null
   status: AppStatus
   failureReason: string | null
+  /** UTC ISO-8601, 예: "2026-11-18T08:00:00.123Z" */
   createdAt: string
+  /** UTC ISO-8601, 예: "2026-11-18T08:00:00.123Z" */
   updatedAt: string
 }
 

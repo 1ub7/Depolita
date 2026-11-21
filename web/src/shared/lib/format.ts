@@ -6,10 +6,6 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60],
 ]
 
-/**
- * 서버의 LocalDateTime 은 시간대 없이 "2026-11-15T00:10:42" 처럼 온다.
- * 서버가 Asia/Seoul 기준이므로 브라우저 로컬 시간으로 해석한다.
- */
 export function parseServerDate(value: string): Date {
   return new Date(value)
 }
@@ -35,7 +31,6 @@ export function formatDateTime(value: string): string {
   return dateTimeFormat.format(parseServerDate(value))
 }
 
-/** https://github.com/owner/repo(.git) → github.com/owner/repo */
 export function shortRepo(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\.git$/, '')
 }
