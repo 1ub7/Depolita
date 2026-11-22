@@ -22,8 +22,10 @@ services:
     build: ./web
     container_name: depolita_web
     environment:
+      # nginx 가 /api 요청을 넘길 Spring Boot 주소
       API_UPSTREAM: ${API_UPSTREAM:-http://host.docker.internal:8081}
     extra_hosts:
+      # 리눅스(EC2)에서도 host.docker.internal 로 호스트에 접근할 수 있게 한다
       - "host.docker.internal:host-gateway"
     ports:
       - "${WEB_PORT:-3000}:8080"
