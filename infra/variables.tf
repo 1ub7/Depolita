@@ -11,7 +11,7 @@ variable "instance_type" {
 }
 
 variable "my_ip_cidr" {
-  description = "SSH·대시보드 접속을 허용할 내 IP"
+  description = "SSH 접속을 허용할 내 IP"
   type        = string
   validation {
     condition     = can(cidrhost(var.my_ip_cidr, 0))
