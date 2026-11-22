@@ -32,7 +32,6 @@ export function DeployForm() {
       () => reset(),
       (error: unknown) => {
         if (!(error instanceof ApiError)) throw error
-        // 서버 검증 실패(INVALID_INPUT)는 해당 입력칸 아래에 보여준다
         const fieldErrors = error.fieldErrors.filter((fe) => isField(fe.field))
         fieldErrors.forEach((fe) => {
           if (isField(fe.field)) setError(fe.field, { message: fe.reason })
@@ -105,8 +104,8 @@ export function DeployForm() {
         </p>
       )}
       <p className="text-muted text-xs">
-        소문자·숫자·하이픈 3–50자 · 저장소 루트에 Dockerfile 필요 · 허용된 GitHub 계정만 배포 · 외부
-        포트는 10001–10999에서 자동 할당
+        소문자·숫자·하이픈 3–50자 · 저장소 루트에 Dockerfile 필요 · GitHub 공개 저장소만 배포 가능 ·
+        외부 포트는 10001–10999에서 자동 할당
       </p>
     </Card>
   )
