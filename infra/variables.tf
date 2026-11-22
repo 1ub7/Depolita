@@ -11,11 +11,21 @@ variable "instance_type" {
 }
 
 variable "my_ip_cidr" {
-  description = "SSH·대시보드 접속을 허용할 내 IP"
+  description = "SSH 접속을 허용할 내 IP"
   type        = string
   validation {
     condition     = can(cidrhost(var.my_ip_cidr, 0))
     error_message = "CIDR 형식이어야 합니다."
+  }
+}
+
+variable "dashboard_allowed_cidrs" {
+  description = "대시보드(80) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = alltrue([for c in var.dashboard_allowed_cidrs : can(cidrhost(c, 0))])
+    error_message = "모든 항목이 CIDR 형식이어야 합니다."
   }
 }
 
