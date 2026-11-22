@@ -30,7 +30,7 @@ resource "aws_security_group" "this" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip_cidr]
   }
 
   ingress {
@@ -38,7 +38,7 @@ resource "aws_security_group" "this" {
     from_port   = var.app_port_from
     to_port     = var.app_port_to
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
