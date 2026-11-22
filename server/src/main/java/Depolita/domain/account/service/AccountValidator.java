@@ -14,7 +14,7 @@ public class AccountValidator {
     public GithubRepository validate(String url) {
         GithubRepository repository = GithubRepository.parse(url);
 
-        if (!properties.allowedAccounts().contains(repository.owner())) {
+        if (!properties.allows(repository.owner())) {
             throw new NotAllowedAccountException();
         }
         return repository;
