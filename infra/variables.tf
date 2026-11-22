@@ -19,6 +19,16 @@ variable "my_ip_cidr" {
   }
 }
 
+variable "dashboard_allowed_cidrs" {
+  description = "대시보드(80) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = alltrue([for c in var.dashboard_allowed_cidrs : can(cidrhost(c, 0))])
+    error_message = "모든 항목이 CIDR 형식이어야 합니다."
+  }
+}
+
 variable "public_key_path" {
   description = "EC2에 등록할 SSH 공개키 경로"
   type        = string
