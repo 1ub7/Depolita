@@ -38,7 +38,7 @@ resource "aws_security_group" "this" {
     from_port   = var.app_port_from
     to_port     = var.app_port_to
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip_cidr]
   }
 
   egress {
@@ -72,6 +72,10 @@ resource "aws_instance" "this" {
 
   tags = {
     Name = "depolita"
+  }
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
   }
 }
 

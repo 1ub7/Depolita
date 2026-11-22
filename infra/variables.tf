@@ -1,28 +1,28 @@
 variable "region" {
   description = "AWS 리전"
-  type = string
-  default = "ap-northeast-2"
+  type        = string
+  default     = "ap-northeast-2"
 }
 
 variable "instance_type" {
   description = "EC2 인스턴스 타입"
-  type = string
-  default = "t3.small"
+  type        = string
+  default     = "t3.small"
 }
 
 variable "my_ip_cidr" {
-  description = "SSH 접속을 허용할 내 IP"
-  type = string
+  description = "SSH·대시보드 접속을 허용할 내 IP"
+  type        = string
   validation {
-    condition = can(cidrhost(var.my_ip_cidr, 0))
+    condition     = can(cidrhost(var.my_ip_cidr, 0))
     error_message = "CIDR 형식이어야 합니다."
   }
 }
 
 variable "public_key_path" {
   description = "EC2에 등록할 SSH 공개키 경로"
-  type = string
-  default = "~/.ssh/id_ed25519.pub"
+  type        = string
+  default     = "~/.ssh/id_ed25519.pub"
 }
 
 variable "disk_size_gb" {
