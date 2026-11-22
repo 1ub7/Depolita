@@ -3,7 +3,6 @@ package Depolita.domain.app.service;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.repository.AppRepository;
-import Depolita.domain.app.service.AppReconciler;
 import Depolita.domain.app.port.ContainerRuntime;
 import Depolita.domain.app.port.ContainerRuntime.ContainerInspection;
 import Depolita.domain.app.port.ContainerRuntime.ContainerStatus;
