@@ -32,6 +32,7 @@ export function DeployForm() {
       () => reset(),
       (error: unknown) => {
         if (!(error instanceof ApiError)) throw error
+        // 서버 검증 실패(INVALID_INPUT)는 해당 입력칸 아래에 보여준다
         const fieldErrors = error.fieldErrors.filter((fe) => isField(fe.field))
         fieldErrors.forEach((fe) => {
           if (isField(fe.field)) setError(fe.field, { message: fe.reason })
