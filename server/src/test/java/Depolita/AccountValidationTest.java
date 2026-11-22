@@ -59,6 +59,24 @@ class AccountValidationTest {
     }
 
     @Test
+    @DisplayName("ALLOWED_ACCOUNTS=* 이면 모든 계정 허용")
+    void allowAll() {
+        AccountValidator validator = new AccountValidator(new AllowedAccountProperties(Set.of(" * ")));
+
+        assertDoesNotThrow(() -> validator.validate("https://github.com/someone/repo"));
+        assertDoesNotThrow(() -> validator.validate("https://github.com/1ub7/Depolita"));
+    }
+
+    @Test
+    @DisplayName("* 이어도 GitHub 저장소 주소 형식은 그대로 검사")
+    void allowAllStillValidatesUrl() {
+        AccountValidator validator = new AccountValidator(new AllowedAccountProperties(Set.of("*")));
+
+        assertThrows(InvalidRepositoryUrlException.class,
+                () -> validator.validate("https://gitlab.com/someone/repo"));
+    }
+
+    @Test
     @DisplayName("설정이 비어 있어도 NPE 없이 모두 거절")
     void emptyConfig() {
         AccountValidator validator = new AccountValidator(new AllowedAccountProperties(null));
