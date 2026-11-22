@@ -59,7 +59,6 @@ resource "aws_instance" "this" {
     swap_size_gb = var.swap_size_gb
     repo_url     = var.repo_url
   })
-  user_data_replace_on_change = true
 
   root_block_device {
     volume_type = "gp3"
