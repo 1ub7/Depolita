@@ -1,3 +1,7 @@
+# API 키 무차별 대입 방지: IP당 초당 5회 (대시보드 폴링은 3초 간격이라 정상 사용엔 영향 없음)
+# conf.d 파일은 http 블록 안에 include 되므로 server 바깥에 둔다
+limit_req_zone $binary_remote_addr zone=api:10m rate=5r/s;
+
 server {
     listen 8080;
     server_name _;
@@ -20,6 +24,8 @@ server {
 
     # 프론트와 API 를 같은 출처로 묶는다 → 브라우저 CORS 문제 없음
     location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        limit_req_status 429;
         proxy_pass ${API_UPSTREAM};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
