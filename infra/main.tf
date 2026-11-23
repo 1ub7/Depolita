@@ -26,7 +26,7 @@ resource "aws_security_group" "this" {
   }
 
   ingress {
-    description = "HTTP (Let's Encrypt 인증, https 리다이렉트 전용. 항상 공개)"
+    description = "HTTP for ACME challenge and HTTPS redirect (always open)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"

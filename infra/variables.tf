@@ -20,7 +20,7 @@ variable "my_ip_cidr" {
 }
 
 variable "dashboard_allowed_cidrs" {
-  description = "대시보드(80·443) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
+  description = "대시보드(443) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
   type        = list(string)
   default     = ["0.0.0.0/0"]
   validation {
