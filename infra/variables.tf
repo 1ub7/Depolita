@@ -10,17 +10,17 @@ variable "instance_type" {
   default     = "t3.small"
 }
 
-variable "my_ip_cidr" {
+variable "ssh_allowed_cidr" {
   description = "SSH 접속을 허용할 내 IP"
   type        = string
   validation {
-    condition     = can(cidrhost(var.my_ip_cidr, 0))
+    condition     = can(cidrhost(var.ssh_allowed_cidr, 0))
     error_message = "CIDR 형식이어야 합니다."
   }
 }
 
 variable "dashboard_allowed_cidrs" {
-  description = "대시보드(443) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
+  description = "대시보드(80·443) 접속을 허용할 CIDR 목록. 기본은 전체 공개이며, 인증은 API 키로 한다"
   type        = list(string)
   default     = ["0.0.0.0/0"]
   validation {

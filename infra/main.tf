@@ -22,15 +22,15 @@ resource "aws_security_group" "this" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
+    cidr_blocks = [var.ssh_allowed_cidr]
   }
 
   ingress {
-    description = "HTTP for ACME challenge and HTTPS redirect (always open)"
+    description = "Dashboard (web)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.dashboard_allowed_cidrs
   }
 
   ingress {
