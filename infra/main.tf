@@ -26,11 +26,11 @@ resource "aws_security_group" "this" {
   }
 
   ingress {
-    description = "Dashboard (web)"
+    description = "HTTP (Let's Encrypt 인증, https 리다이렉트 전용. 항상 공개)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.dashboard_allowed_cidrs
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
