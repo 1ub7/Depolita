@@ -6,6 +6,7 @@ import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppResponse;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
+import Depolita.domain.app.exception.AppLimitExceededException;
 import Depolita.domain.app.exception.DuplicateAppNameException;
 import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.domain.app.port.ContainerRuntime.ContainerStatus;
@@ -97,6 +98,27 @@ class AppServiceTest {
 
         verify(appRepository, never()).save(any());
         verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("실행 중인 앱이 최대 개수면 AppLimitExceededException, 저장도 배포 이벤트도 없다")
+    void appLimitExceeded() {
+        when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS);
+
+        assertThrows(AppLimitExceededException.class, () -> appService.create(REQUEST));
+
+        verify(appRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("최대 개수보다 하나 적으면 생성된다")
+    void belowAppLimit() {
+        when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS - 1);
+
+        AppResponse response = appService.create(REQUEST);
+
+        assertEquals(AppStatus.CLONING, response.status());
     }
 
     @Test
