@@ -18,6 +18,9 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class DockerImageBuilder implements ImageBuilder {
     private static final int LOG_TAIL_LENGTH = 300;
+    static final long BUILD_MEMORY = 1024L * 1024 * 1024;        
+    static final long BUILD_MEMORY_SWAP = 2048L * 1024 * 1024;   
+    static final String BUILD_CPUSET = "0";
     private final DockerClient dockerClient;
 
     @Override
@@ -26,6 +29,9 @@ public class DockerImageBuilder implements ImageBuilder {
         try {
             return dockerClient.buildImageCmd(contextDir.toFile())
                     .withTags(Set.of(tag))
+                    .withMemory(BUILD_MEMORY)
+                    .withMemswap(BUILD_MEMORY_SWAP)
+                    .withCpusetcpus(BUILD_CPUSET)
                     .exec(new BuildImageResultCallback() {
                         @Override
                         public void onNext(BuildResponseItem item) {
