@@ -6,6 +6,8 @@ import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppLogResponse;
 import Depolita.domain.app.dto.AppResponse;
 import Depolita.domain.app.entity.App;
+import Depolita.domain.app.entity.AppStatus;
+import Depolita.domain.app.exception.AppLimitExceededException;
 import Depolita.domain.app.exception.AppNotFoundException;
 import Depolita.domain.app.exception.DuplicateAppNameException;
 import Depolita.domain.app.exception.InvalidAppStatusException;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,6 +36,9 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class AppService {
     private static final int MAX_CREATE_ATTEMPTS = 3;
+    static final int MAX_ACTIVE_APPS = 5;
+    private static final Set<AppStatus> ACTIVE_STATUSES =
+            EnumSet.of(AppStatus.CLONING, AppStatus.BUILDING, AppStatus.RUNNING);
 
     private final AppRepository appRepository;
     private final AccountValidator accountValidator;
@@ -64,6 +70,9 @@ public class AppService {
     private AppResponse save(AppCreateRequest request, GithubRepository repository, Set<Integer> inUseOnHost) {
         if (appRepository.existsByName(request.name())) {
             throw new DuplicateAppNameException();
+        }
+        if (appRepository.countByStatusIn(ACTIVE_STATUSES) >= MAX_ACTIVE_APPS) {
+            throw new AppLimitExceededException();
         }
         App app = appRepository.save(App.create(
                 request.name(),

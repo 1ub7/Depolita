@@ -21,6 +21,7 @@ public enum ErrorCode {
     DOCKERFILE_NOT_FOUND(HttpStatus.BAD_REQUEST, "저장소에 Dockerfile이 없습니다."),
     PORT_ALLOCATION_CONFLICT(HttpStatus.CONFLICT, "포트 할당이 충돌했습니다. 잠시 후 다시 시도해주세요."),
     DEPLOY_QUEUE_FULL(HttpStatus.SERVICE_UNAVAILABLE, "배포 대기열이 가득 찼습니다. 잠시 후 다시 시도해주세요."),
+    APP_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "실행 중인 앱이 최대 개수에 도달했습니다. 사용하지 않는 앱을 중지하거나 삭제해주세요."),
     // Account
     NOT_ALLOWED_ACCOUNT(HttpStatus.FORBIDDEN, "허용되지 않은 GitHub 계정입니다."),
     INVALID_REPOSITORY_URL(HttpStatus.BAD_REQUEST, "올바른 GitHub 저장소 주소가 아닙니다."),
