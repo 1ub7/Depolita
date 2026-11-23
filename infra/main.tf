@@ -34,6 +34,14 @@ resource "aws_security_group" "this" {
   }
 
   ingress {
+    description = "Dashboard (https)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.dashboard_allowed_cidrs
+  }
+
+  ingress {
     description = "Deployed apps"
     from_port   = var.app_port_from
     to_port     = var.app_port_to
