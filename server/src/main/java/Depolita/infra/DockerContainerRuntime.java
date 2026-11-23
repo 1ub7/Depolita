@@ -12,6 +12,7 @@ import com.github.dockerjava.api.model.ContainerPort;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.LogConfig;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.api.model.RestartPolicy;
@@ -36,18 +37,14 @@ public class DockerContainerRuntime implements ContainerRuntime {
     private static final long MEMORY_LIMIT = 512L * 1024 * 1024;
     private static final long NANO_CPUS = 500_000_000L;
     private static final int MAX_LOG_TAIL = 1000;
+    static final Map<String, String> LOG_OPTIONS = Map.of("max-size", "10m", "max-file", "3");
 
     private final DockerClient dockerClient;
 
     @Override
     public String run(Long appId, String image, String name, int hostPort, int containerPort) {
         ExposedPort exposed = ExposedPort.tcp(containerPort);
-        HostConfig hostConfig = HostConfig.newHostConfig()
-                .withPortBindings(new PortBinding(Ports.Binding.bindPort(hostPort), exposed))
-                .withMemory(MEMORY_LIMIT)
-                .withMemorySwap(MEMORY_LIMIT)
-                .withNanoCPUs(NANO_CPUS)
-                .withRestartPolicy(RestartPolicy.unlessStoppedRestart());
+        HostConfig hostConfig = hostConfig(hostPort, exposed);
 
         String containerId = null;
         try {
@@ -64,6 +61,16 @@ public class DockerContainerRuntime implements ContainerRuntime {
             if (containerId != null) remove(containerId);
             throw new CustomException(ErrorCode.CONTAINER_RUN_FAILED, e);
         }
+    }
+
+    static HostConfig hostConfig(int hostPort, ExposedPort exposed) {
+        return HostConfig.newHostConfig()
+                .withPortBindings(new PortBinding(Ports.Binding.bindPort(hostPort), exposed))
+                .withMemory(MEMORY_LIMIT)
+                .withMemorySwap(MEMORY_LIMIT)
+                .withNanoCPUs(NANO_CPUS)
+                .withRestartPolicy(RestartPolicy.unlessStoppedRestart())
+                .withLogConfig(new LogConfig(LogConfig.LoggingType.JSON_FILE, LOG_OPTIONS));
     }
 
     @Override

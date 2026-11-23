@@ -1,8 +1,17 @@
 name: depolita
 
+# 공개 서버는 스캐너 요청으로 로그가 계속 쌓인다. 도커 기본값(json-file)은 크기 제한이 없어서
+# 디스크가 차면 빌드·MySQL 이 같이 멈추므로 컨테이너당 최대 30MB (10MB x 3) 로 제한한다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   mysql:
     image: mysql:8.4
+    logging: *default-logging
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USERNAME}
@@ -22,6 +31,7 @@ services:
 
   server:
     build: ./server
+    logging: *default-logging
     network_mode: host
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -49,6 +59,7 @@ services:
 
   web:
     build: ./web
+    logging: *default-logging
     environment:
       API_UPSTREAM: http://host.docker.internal:8081
     extra_hosts:
