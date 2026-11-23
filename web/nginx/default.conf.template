@@ -9,6 +9,15 @@ server {
 
     server_tokens off;
 
+    # 운영에서는 Caddy 뒤에 있으므로 $remote_addr 가 Caddy 컨테이너 IP 가 된다.
+    # 사설 대역(도커 네트워크)에서 온 요청은 X-Forwarded-For 의 값을 실제 클라이언트 IP 로 복원한다.
+    # → limit_req 가 사용자별로 동작하고, 로그에도 실제 IP 가 남는다.
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
     # 주의: 하위 location 에 add_header 가 하나라도 있으면 여기 헤더는 상속되지 않는다.
     # 그래서 add_header 를 쓰는 location 마다 같은 파일을 다시 include 한다.
     include /etc/nginx/snippets/security-headers.conf;
