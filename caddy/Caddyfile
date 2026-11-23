@@ -1,0 +1,8 @@
+# 대시보드 HTTPS 종단(TLS termination)
+# - {$DOMAIN} 은 .env 의 DOMAIN (예: depolita.duckdns.org). 이 도메인이 EIP 를 가리켜야 인증서가 발급된다
+# - 인증서는 Let's Encrypt 에서 자동 발급·갱신되고 caddy-data 볼륨에 저장된다
+# - http:// 요청은 Caddy 가 자동으로 https:// 로 리다이렉트한다
+# - Caddy 는 클라이언트가 보낸 X-Forwarded-For 를 버리고 실제 접속 IP 로 새로 채워서 넘긴다 (IP 위조 방지)
+{$DOMAIN} {
+	reverse_proxy web:8080
+}

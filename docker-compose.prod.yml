@@ -64,12 +64,29 @@ services:
       API_UPSTREAM: http://host.docker.internal:8081
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "${WEB_PORT:-80}:8080"
     depends_on:
       server:
         condition: service_healthy
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2
+    logging: *default-logging
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"  
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   mysql-data:
+  caddy-data:
+  caddy-config:
