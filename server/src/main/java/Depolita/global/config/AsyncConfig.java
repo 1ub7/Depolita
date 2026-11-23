@@ -14,8 +14,8 @@ public class AsyncConfig {
     @Bean(name = "deployExecutor")
     public Executor deployExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(2);
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
         executor.setQueueCapacity(20);
         executor.setThreadNamePrefix("deploy-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
