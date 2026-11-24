@@ -53,7 +53,7 @@ public class DeployService {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onAppCreated(AppCreatedEvent event) {
+    public void onDeployRequested(DeployRequestedEvent event) {
         Long appId = event.appId();
         try {
             deployExecutor.execute(() -> deploy(appId));
@@ -71,7 +71,7 @@ public class DeployService {
             App app = appRepository.findById(appId)
                     .orElseThrow(AppNotFoundException::new);
 
-            // 1. Clone (생성 시 상태가 이미 CLONING)
+            // 1. Clone (생성·재배포 요청 시 상태가 이미 CLONING)
             workDir = sourceFetcher.fetch(app.getRepositoryUrl());
             if (!Files.exists(workDir.resolve("Dockerfile"))) {
                 throw new DockerfileNotFoundException();
@@ -82,6 +82,11 @@ public class DeployService {
             imageBuilder.build(workDir, imageTag(appId));
 
             // 3. Run
+            // 재배포라면 같은 컨테이너 이름(depolita-app-{id})과 포트를 쓰는 이전 컨테이너를 먼저 지운다.
+            // 빌드가 끝날 때까지는 이전 버전이 계속 서비스된다.
+            if (app.getContainerId() != null) {
+                containerRuntime.remove(app.getContainerId());
+            }
             containerId = containerRuntime.run(
                     appId,
                     imageTag(appId),

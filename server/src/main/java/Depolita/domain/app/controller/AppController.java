@@ -54,6 +54,12 @@ public class AppController {
         return appService.stop(appId);
     }
 
+    @PostMapping("/{appId}/redeploy")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public AppResponse redeploy(@PathVariable Long appId) {
+        return appService.redeploy(appId);
+    }
+
     @DeleteMapping("/{appId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long appId) {

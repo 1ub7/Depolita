@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.Objects;
+
 @Entity
 @Table(name = "apps")
 @Getter
@@ -86,6 +88,18 @@ public class App extends BaseTimeEntity {
         changeStatus(AppStatus.FAILED);
         this.failureReason = truncate(reason);
         releasePort();
+    }
+
+    public void redeploy(Integer newPort) {
+        changeStatus(AppStatus.CLONING);
+        this.failureReason = null;
+        if (needsPort()) {
+            this.assignedPort = Objects.requireNonNull(newPort, "반납된 포트는 다시 할당해야 합니다.");
+        }
+    }
+
+    public boolean needsPort() {
+        return assignedPort == null;
     }
 
     public boolean isInProgress() {

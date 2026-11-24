@@ -16,6 +16,9 @@ export const isInProgress = (status: AppStatus) => status === 'CLONING' || statu
 /** 서버 AppStatus.canTransitionTo(STOPPED): RUNNING 에서만 중지 가능 */
 export const canStop = (status: AppStatus) => status === 'RUNNING'
 
+/** 서버 AppService.redeploy: 진행 중이 아니면 언제든 재배포 가능 */
+export const canRedeploy = (status: AppStatus) => !isInProgress(status)
+
 /** 서버 AppService.delete: 진행 중이면 INVALID_APP_STATUS */
 export const canDelete = (status: AppStatus) => !isInProgress(status)
 

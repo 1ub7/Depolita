@@ -62,6 +62,17 @@ export function useStopApp() {
   })
 }
 
+export function useRedeployApp() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => appsApi.redeploy(id),
+    onSuccess: (app: App) => {
+      queryClient.setQueryData(appKeys.detail(app.id), app)
+      return queryClient.invalidateQueries({ queryKey: appKeys.list() })
+    },
+  })
+}
+
 export function useDeleteApp() {
   const queryClient = useQueryClient()
   return useMutation({

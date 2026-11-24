@@ -91,4 +91,67 @@ class AppTest {
 
         assertEquals(App.FAILURE_REASON_MAX_LENGTH, app.getFailureReason().length());
     }
+
+    // ---------- redeploy ----------
+
+    private App runningApp() {
+        App app = newApp();
+        app.startBuilding();
+        app.run("container-1");
+        return app;
+    }
+
+    @Test
+    @DisplayName("실행 중인 앱을 재배포하면 CLONING이 되고 포트와 컨테이너 ID는 유지된다")
+    void redeployRunningKeepsPort() {
+        App app = runningApp();
+
+        app.redeploy(null);
+
+        assertEquals(AppStatus.CLONING, app.getStatus());
+        assertEquals(10001, app.getAssignedPort());
+        assertEquals("container-1", app.getContainerId());
+    }
+
+    @Test
+    @DisplayName("중지한 앱을 재배포하면 새 포트를 받는다")
+    void redeployStoppedGetsNewPort() {
+        App app = runningApp();
+        app.stop();
+
+        app.redeploy(10002);
+
+        assertEquals(AppStatus.CLONING, app.getStatus());
+        assertEquals(10002, app.getAssignedPort());
+    }
+
+    @Test
+    @DisplayName("실패한 앱을 재배포하면 실패 원인을 지운다")
+    void redeployFailedClearsReason() {
+        App app = newApp();
+        app.fail("빌드 실패");
+
+        app.redeploy(10002);
+
+        assertNull(app.getFailureReason());
+        assertEquals(10002, app.getAssignedPort());
+    }
+
+    @Test
+    @DisplayName("포트를 반납한 앱인데 새 포트가 없으면 재배포할 수 없다")
+    void redeployWithoutPortFails() {
+        App app = newApp();
+        app.fail("빌드 실패");
+
+        assertThrows(NullPointerException.class, () -> app.redeploy(null));
+    }
+
+    @Test
+    @DisplayName("배포 진행 중에는 재배포할 수 없다")
+    void cannotRedeployInProgress() {
+        App app = newApp();
+
+        assertThrows(InvalidAppStatusException.class, () -> app.redeploy(null));
+        assertEquals(AppStatus.CLONING, app.getStatus());
+    }
 }
