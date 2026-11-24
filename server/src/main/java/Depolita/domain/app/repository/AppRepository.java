@@ -11,6 +11,7 @@ import java.util.List;
 
 public interface AppRepository extends JpaRepository<App, Long> {
     boolean existsByName(String name);
+    List<App> findAllByRepositoryUrl(String repositoryUrl);
     List<App> findAllByOrderByCreatedAtDesc();
     List<App> findAllByStatusIn(Collection<AppStatus> statuses);
     long countByStatusIn(Collection<AppStatus> statuses);
