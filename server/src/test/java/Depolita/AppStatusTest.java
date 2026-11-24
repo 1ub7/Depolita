@@ -23,17 +23,26 @@ class AppStatusTest {
     }
 
     @Test
+    @DisplayName("실행 중·중지·실패 상태에서는 재배포(CLONING)할 수 있다")
+    void redeployTransitions() {
+        assertTrue(AppStatus.RUNNING.canTransitionTo(AppStatus.CLONING));
+        assertTrue(AppStatus.STOPPED.canTransitionTo(AppStatus.CLONING));
+        assertTrue(AppStatus.FAILED.canTransitionTo(AppStatus.CLONING));
+    }
+
+    @Test
     @DisplayName("단계를 건너뛰거나 되돌아갈 수 없다")
     void forbiddenTransitions() {
         assertFalse(AppStatus.CLONING.canTransitionTo(AppStatus.RUNNING));
         assertFalse(AppStatus.RUNNING.canTransitionTo(AppStatus.BUILDING));
         assertFalse(AppStatus.BUILDING.canTransitionTo(AppStatus.CLONING));
+        assertFalse(AppStatus.CLONING.canTransitionTo(AppStatus.CLONING));
     }
 
     @ParameterizedTest
-    @EnumSource(AppStatus.class)
-    @DisplayName("STOPPED, FAILED는 종료 상태라 어디로도 갈 수 없다")
-    void terminalStates(AppStatus next) {
+    @EnumSource(value = AppStatus.class, names = "CLONING", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("STOPPED, FAILED는 재배포(CLONING)로만 나갈 수 있다")
+    void stoppedAndFailedOnlyRedeploy(AppStatus next) {
         assertFalse(AppStatus.STOPPED.canTransitionTo(next));
         assertFalse(AppStatus.FAILED.canTransitionTo(next));
     }

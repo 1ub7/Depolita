@@ -32,6 +32,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
@@ -132,7 +133,7 @@ class AppServiceTest {
 
         assertEquals(AppStatus.CLONING, response.status());
         verify(appRepository, times(2)).save(any());
-        verify(eventPublisher, times(1)).publishEvent(any(AppCreatedEvent.class));
+        verify(eventPublisher, times(1)).publishEvent(any(DeployRequestedEvent.class));
     }
 
     @Test
@@ -200,6 +201,96 @@ class AppServiceTest {
         givenApp(1L, AppStatus.RUNNING, "already-removed");
 
         assertEquals(AppStatus.STOPPED, appService.stop(1L).status());
+    }
+
+    // ---------- redeploy ----------
+
+    private static App newStoppedApp(Long id) {
+        App app = withId(App.create("app-" + id, "https://github.com/1ub7/demo.git", 8080, 10001), id);
+        app.startBuilding();
+        app.run("c-" + id);
+        app.stop();
+        return app;
+    }
+
+    private App givenStoppedApp(Long id) {
+        App app = newStoppedApp(id);
+        when(appRepository.findById(id)).thenReturn(Optional.of(app));
+        return app;
+    }
+
+    @Test
+    @DisplayName("실행 중인 앱을 재배포하면 같은 포트를 유지하고 포트를 새로 고르지 않는다")
+    void redeployRunningKeepsPort() {
+        givenApp(1L, AppStatus.RUNNING, "c-1");
+
+        AppResponse response = appService.redeploy(1L);
+
+        assertEquals(AppStatus.CLONING, response.status());
+        assertEquals(10001, response.assignedPort());
+        verify(portAllocator, never()).allocate(anySet());
+        verify(eventPublisher).publishEvent(any(DeployRequestedEvent.class));
+    }
+
+    @Test
+    @DisplayName("중지한 앱을 재배포하면 포트를 새로 할당받는다")
+    void redeployStoppedAllocatesPort() {
+        App app = givenStoppedApp(1L);
+        when(portAllocator.allocate(anySet())).thenReturn(10002);
+
+        appService.redeploy(1L);
+
+        assertEquals(10002, app.getAssignedPort());
+        verify(portAllocator).allocate(anySet());
+    }
+
+    @Test
+    @DisplayName("배포 진행 중인 앱은 재배포할 수 없다")
+    void cannotRedeployInProgress() {
+        givenApp(1L, AppStatus.BUILDING, null);
+
+        assertThrows(InvalidAppStatusException.class, () -> appService.redeploy(1L));
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("중지한 앱을 재배포할 때 활성 앱이 최대 개수면 AppLimitExceededException")
+    void redeployStoppedRespectsAppLimit() {
+        givenStoppedApp(1L);
+        when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS);
+
+        assertThrows(AppLimitExceededException.class, () -> appService.redeploy(1L));
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("실행 중인 앱의 재배포는 활성 앱 수가 늘지 않으므로 개수 제한에 걸리지 않는다")
+    void redeployRunningIgnoresAppLimit() {
+        givenApp(1L, AppStatus.RUNNING, "c-1");
+        when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS);
+
+        AppResponse response = appService.redeploy(1L);
+
+        assertEquals(AppStatus.CLONING, response.status());
+    }
+
+    @Test
+    @DisplayName("재배포 중 포트가 충돌하면 다시 시도한다")
+    void redeployRetriesOnPortConflict() {
+        // 실제로는 롤백 후 새 트랜잭션에서 엔티티를 다시 읽으므로, 시도마다 새 객체를 돌려준다
+        App firstTry = newStoppedApp(1L);
+        App secondTry = newStoppedApp(1L);
+        when(appRepository.findById(1L)).thenReturn(Optional.of(firstTry), Optional.of(secondTry));
+        when(appRepository.saveAndFlush(any(App.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_apps_assigned_port"))
+                .thenReturn(secondTry);
+
+        appService.redeploy(1L);
+
+        verify(appRepository, times(2)).saveAndFlush(any(App.class));
+        assertTrue(secondTry.isInProgress());
     }
 
     // ---------- delete ----------

@@ -3,7 +3,7 @@ package Depolita;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.repository.AppRepository;
-import Depolita.domain.app.service.AppCreatedEvent;
+import Depolita.domain.app.service.DeployRequestedEvent;
 import Depolita.domain.app.service.DeployService;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,7 +63,7 @@ class DeployServiceTest {
     }
 
     private void deploy() {
-        deployService(Runnable::run).onAppCreated(new AppCreatedEvent(APP_ID));
+        deployService(Runnable::run).onDeployRequested(new DeployRequestedEvent(APP_ID));
     }
 
     private void givenDockerfile() throws IOException {
@@ -153,10 +155,49 @@ class DeployServiceTest {
             throw new RejectedExecutionException();
         };
 
-        deployService(rejecting).onAppCreated(new AppCreatedEvent(APP_ID));
+        deployService(rejecting).onDeployRequested(new DeployRequestedEvent(APP_ID));
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertEquals(ErrorCode.DEPLOY_QUEUE_FULL.getMessage(), app.getFailureReason());
         verify(sourceFetcher, never()).fetch(anyString());
+    }
+
+    @Test
+    @DisplayName("재배포: 빌드가 끝난 뒤 이전 컨테이너를 지우고 새 컨테이너를 같은 포트로 띄운다")
+    void redeployReplacesOldContainer() throws IOException {
+        app.startBuilding();
+        app.run("old-container");
+        app.redeploy(null);
+        givenDockerfile();
+        when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("new-container");
+
+        deploy();
+
+        InOrder order = inOrder(imageBuilder, containerRuntime);
+        order.verify(imageBuilder).build(any(), anyString());
+        order.verify(containerRuntime).remove("old-container");
+        order.verify(containerRuntime).run(eq(APP_ID), anyString(), anyString(), eq(10001), anyInt());
+        assertEquals(AppStatus.RUNNING, app.getStatus());
+        assertEquals("new-container", app.getContainerId());
+    }
+
+    @Test
+    @DisplayName("재배포 중 빌드가 실패하면 이전 컨테이너는 건드리지 않는다 (정리는 재조정 루프 담당)")
+    void redeployBuildFailureKeepsOldContainerUntouched() throws IOException {
+        app.startBuilding();
+        app.run("old-container");
+        app.redeploy(null);
+        givenDockerfile();
+        when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(imageBuilder.build(any(), anyString()))
+                .thenThrow(new CustomException(ErrorCode.IMAGE_BUILD_FAILED, "npm ERR!", new RuntimeException()));
+
+        deploy();
+
+        assertEquals(AppStatus.FAILED, app.getStatus());
+        verify(containerRuntime, never()).remove(anyString());
     }
 }
