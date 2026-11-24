@@ -89,7 +89,7 @@ public class App extends BaseTimeEntity {
         this.failureReason = truncate(reason);
         releasePort();
     }
-    
+
     public void redeploy(Integer newPort) {
         changeStatus(AppStatus.CLONING);
         this.failureReason = null;
