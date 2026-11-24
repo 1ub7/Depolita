@@ -3,6 +3,7 @@ package Depolita.domain.webhook.service;
 import Depolita.domain.account.service.AccountValidator;
 import Depolita.domain.account.support.GithubRepository;
 import Depolita.domain.app.entity.App;
+import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.domain.app.repository.AppRepository;
 import Depolita.domain.app.service.AppService;
@@ -48,6 +49,12 @@ public class GithubWebhookService {
         List<Long> redeployed = new ArrayList<>();
         List<Long> skipped = new ArrayList<>();
         for (App app : apps) {
+            if (app.getStatus() == AppStatus.STOPPED) {
+                // 사용자가 일부러 중지한 앱(포트·활성 앱 자리를 반납한 상태)을 push 로 되살리지 않는다
+                log.info("[webhook] appId={} 중지된 앱이라 건너뜀", app.getId());
+                skipped.add(app.getId());
+                continue;
+            }
             try {
                 appService.redeploy(app.getId(), DeployTrigger.WEBHOOK);
                 redeployed.add(app.getId());
