@@ -12,6 +12,7 @@ import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.domain.app.port.ContainerRuntime.ContainerStatus;
 import Depolita.domain.app.port.ImageBuilder;
 import Depolita.domain.app.repository.AppRepository;
+import Depolita.domain.deployment.entity.DeployTrigger;
 import Depolita.global.config.DepolitaProperties;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
@@ -120,6 +121,7 @@ class AppServiceTest {
         AppResponse response = appService.create(REQUEST);
 
         assertEquals(AppStatus.CLONING, response.status());
+        verify(eventPublisher).publishEvent(new DeployRequestedEvent(1L, DeployTrigger.INITIAL));
     }
 
     @Test
@@ -224,12 +226,12 @@ class AppServiceTest {
     void redeployRunningKeepsPort() {
         givenApp(1L, AppStatus.RUNNING, "c-1");
 
-        AppResponse response = appService.redeploy(1L);
+        AppResponse response = appService.redeploy(1L, DeployTrigger.MANUAL);
 
         assertEquals(AppStatus.CLONING, response.status());
         assertEquals(10001, response.assignedPort());
         verify(portAllocator, never()).allocate(anySet());
-        verify(eventPublisher).publishEvent(any(DeployRequestedEvent.class));
+        verify(eventPublisher).publishEvent(new DeployRequestedEvent(1L, DeployTrigger.MANUAL));
     }
 
     @Test
@@ -238,7 +240,7 @@ class AppServiceTest {
         App app = givenStoppedApp(1L);
         when(portAllocator.allocate(anySet())).thenReturn(10002);
 
-        appService.redeploy(1L);
+        appService.redeploy(1L, DeployTrigger.MANUAL);
 
         assertEquals(10002, app.getAssignedPort());
         verify(portAllocator).allocate(anySet());
@@ -249,7 +251,7 @@ class AppServiceTest {
     void cannotRedeployInProgress() {
         givenApp(1L, AppStatus.BUILDING, null);
 
-        assertThrows(InvalidAppStatusException.class, () -> appService.redeploy(1L));
+        assertThrows(InvalidAppStatusException.class, () -> appService.redeploy(1L, DeployTrigger.MANUAL));
 
         verifyNoInteractions(eventPublisher);
     }
@@ -260,7 +262,7 @@ class AppServiceTest {
         givenStoppedApp(1L);
         when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS);
 
-        assertThrows(AppLimitExceededException.class, () -> appService.redeploy(1L));
+        assertThrows(AppLimitExceededException.class, () -> appService.redeploy(1L, DeployTrigger.MANUAL));
 
         verifyNoInteractions(eventPublisher);
     }
@@ -271,7 +273,7 @@ class AppServiceTest {
         givenApp(1L, AppStatus.RUNNING, "c-1");
         when(appRepository.countByStatusIn(anySet())).thenReturn((long) AppService.MAX_ACTIVE_APPS);
 
-        AppResponse response = appService.redeploy(1L);
+        AppResponse response = appService.redeploy(1L, DeployTrigger.MANUAL);
 
         assertEquals(AppStatus.CLONING, response.status());
     }
@@ -287,7 +289,7 @@ class AppServiceTest {
                 .thenThrow(new DataIntegrityViolationException("uk_apps_assigned_port"))
                 .thenReturn(secondTry);
 
-        appService.redeploy(1L);
+        appService.redeploy(1L, DeployTrigger.MANUAL);
 
         verify(appRepository, times(2)).saveAndFlush(any(App.class));
         assertTrue(secondTry.isInProgress());

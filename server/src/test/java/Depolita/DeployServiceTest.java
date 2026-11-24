@@ -9,7 +9,10 @@ import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import Depolita.domain.app.port.ContainerRuntime;
 import Depolita.domain.app.port.ImageBuilder;
+import Depolita.domain.app.port.FetchedSource;
 import Depolita.domain.app.port.SourceFetcher;
+import Depolita.domain.deployment.entity.DeployTrigger;
+import Depolita.domain.deployment.service.DeploymentRecorder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -40,6 +44,8 @@ import static org.mockito.Mockito.when;
 
 class DeployServiceTest {
     private static final Long APP_ID = 1L;
+    private static final Long DEPLOYMENT_ID = 100L;
+    private static final String COMMIT_SHA = "0123456789abcdef0123456789abcdef01234567";
 
     @TempDir
     Path workDir;
@@ -48,6 +54,7 @@ class DeployServiceTest {
     private final SourceFetcher sourceFetcher = mock(SourceFetcher.class);
     private final ImageBuilder imageBuilder = mock(ImageBuilder.class);
     private final ContainerRuntime containerRuntime = mock(ContainerRuntime.class);
+    private final DeploymentRecorder recorder = mock(DeploymentRecorder.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
     private App app;
@@ -55,15 +62,20 @@ class DeployServiceTest {
     @BeforeEach
     void setUp() {
         when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(recorder.start(eq(APP_ID), any())).thenReturn(DEPLOYMENT_ID);
         app = App.create("my-app", "https://github.com/1ub7/demo.git", 8080, 10001);
     }
 
     private DeployService deployService(Executor executor) {
-        return new DeployService(appRepository, sourceFetcher, imageBuilder, containerRuntime, executor, txManager);
+        return new DeployService(appRepository, sourceFetcher, imageBuilder, containerRuntime, recorder, executor, txManager);
+    }
+
+    private FetchedSource source() {
+        return new FetchedSource(workDir, COMMIT_SHA);
     }
 
     private void deploy() {
-        deployService(Runnable::run).onDeployRequested(new DeployRequestedEvent(APP_ID));
+        deployService(Runnable::run).onDeployRequested(new DeployRequestedEvent(APP_ID, DeployTrigger.MANUAL));
     }
 
     private void givenDockerfile() throws IOException {
@@ -75,7 +87,7 @@ class DeployServiceTest {
     void success() throws IOException {
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
         when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
 
         deploy();
@@ -84,6 +96,9 @@ class DeployServiceTest {
         assertEquals("c-1", app.getContainerId());
         assertEquals(10001, app.getAssignedPort());
         verify(sourceFetcher).cleanup(workDir);
+        verify(recorder).recordClone(eq(DEPLOYMENT_ID), eq(COMMIT_SHA), anyLong());
+        verify(recorder).recordBuild(eq(DEPLOYMENT_ID), anyLong());
+        verify(recorder).succeed(DEPLOYMENT_ID);
     }
 
     @Test
@@ -97,13 +112,15 @@ class DeployServiceTest {
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertNull(app.getAssignedPort());
         verifyNoInteractions(imageBuilder, containerRuntime);
+        verify(recorder).fail(eq(DEPLOYMENT_ID), anyString());
+        verify(recorder, never()).succeed(anyLong());
     }
 
     @Test
     @DisplayName("Dockerfile 없음 → FAILED, 복제한 폴더는 정리")
     void dockerfileMissing() {
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir); // 빈 폴더
+        when(sourceFetcher.fetch(anyString())).thenReturn(source()); // 빈 폴더
 
         deploy();
 
@@ -118,7 +135,7 @@ class DeployServiceTest {
     void buildFailure() throws IOException {
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
         when(imageBuilder.build(any(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.IMAGE_BUILD_FAILED, "npm ERR!", new RuntimeException()));
 
@@ -137,7 +154,7 @@ class DeployServiceTest {
                 .thenReturn(Optional.of(app))
                 .thenThrow(new RuntimeException("DB 연결 끊김"))
                 .thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
         when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
 
         deploy();
@@ -155,11 +172,12 @@ class DeployServiceTest {
             throw new RejectedExecutionException();
         };
 
-        deployService(rejecting).onDeployRequested(new DeployRequestedEvent(APP_ID));
+        deployService(rejecting).onDeployRequested(new DeployRequestedEvent(APP_ID, DeployTrigger.MANUAL));
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertEquals(ErrorCode.DEPLOY_QUEUE_FULL.getMessage(), app.getFailureReason());
         verify(sourceFetcher, never()).fetch(anyString());
+        verify(recorder).fail(DEPLOYMENT_ID, ErrorCode.DEPLOY_QUEUE_FULL.getMessage());
     }
 
     @Test
@@ -170,7 +188,7 @@ class DeployServiceTest {
         app.redeploy(null);
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
         when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("new-container");
 
         deploy();
@@ -191,7 +209,7 @@ class DeployServiceTest {
         app.redeploy(null);
         givenDockerfile();
         when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
-        when(sourceFetcher.fetch(anyString())).thenReturn(workDir);
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
         when(imageBuilder.build(any(), anyString()))
                 .thenThrow(new CustomException(ErrorCode.IMAGE_BUILD_FAILED, "npm ERR!", new RuntimeException()));
 
@@ -199,5 +217,19 @@ class DeployServiceTest {
 
         assertEquals(AppStatus.FAILED, app.getStatus());
         verify(containerRuntime, never()).remove(anyString());
+    }
+
+    @Test
+    @DisplayName("배포 이력을 남기지 못해도(기록 ID null) 배포는 정상 진행된다")
+    void deploysEvenWhenHistoryUnavailable() throws IOException {
+        givenDockerfile();
+        when(recorder.start(eq(APP_ID), any())).thenReturn(null);
+        when(appRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        when(sourceFetcher.fetch(anyString())).thenReturn(source());
+        when(containerRuntime.run(eq(APP_ID), anyString(), anyString(), anyInt(), anyInt())).thenReturn("c-1");
+
+        deploy();
+
+        assertEquals(AppStatus.RUNNING, app.getStatus());
     }
 }
