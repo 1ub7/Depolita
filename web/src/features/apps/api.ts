@@ -15,5 +15,8 @@ export const appsApi = {
 
   stop: (id: number) => http.post<App>(`/apps/${id}/stop`).then((r) => r.data),
 
+  /** 202 Accepted: 같은 설정으로 다시 복제·빌드·실행한다 */
+  redeploy: (id: number) => http.post<App>(`/apps/${id}/redeploy`).then((r) => r.data),
+
   remove: (id: number) => http.delete<void>(`/apps/${id}`).then(() => undefined),
 }

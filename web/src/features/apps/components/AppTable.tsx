@@ -6,7 +6,7 @@ import type { App } from '../model/types'
 import { AppActions } from './AppActions'
 import { StatusBadge } from './StatusBadge'
 
-const GRID = 'grid grid-cols-[200px_120px_140px_minmax(0,1fr)_90px_200px] items-center gap-4'
+const GRID = 'grid grid-cols-[200px_120px_140px_minmax(0,1fr)_90px_260px] items-center gap-4'
 
 type Props = {
   apps: App[]
@@ -37,7 +37,7 @@ export function AppTable({ apps, isFetching }: Props) {
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <div className="min-w-[960px]" role="table">
+          <div className="min-w-[1020px]" role="table">
             <div
               role="row"
               className={clsx(GRID, 'bg-surface-sunken text-muted px-6 py-3 text-xs')}
