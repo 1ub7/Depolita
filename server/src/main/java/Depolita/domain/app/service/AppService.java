@@ -29,13 +29,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AppService {
-    private static final int MAX_CREATE_ATTEMPTS = 3;
+    private static final int MAX_PORT_ATTEMPTS = 3;
     static final int MAX_ACTIVE_APPS = 5;
     private static final Set<AppStatus> ACTIVE_STATUSES =
             EnumSet.of(AppStatus.CLONING, AppStatus.BUILDING, AppStatus.RUNNING);
@@ -54,14 +55,47 @@ public class AppService {
         GithubRepository repository = accountValidator.validate(request.repositoryUrl());
         Set<Integer> inUseOnHost = usedHostPorts();
 
-        for (int attempt = 1; attempt <= MAX_CREATE_ATTEMPTS; attempt++) {
+        return withPortRetry("create",
+                () -> save(request, repository, inUseOnHost),
+                () -> {
+                    if (appRepository.existsByName(request.name())) {
+                        throw new DuplicateAppNameException();
+                    }
+                });
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public AppResponse redeploy(Long appId) {
+        Set<Integer> inUseOnHost = usedHostPorts();
+
+        return withPortRetry("redeploy", () -> {
+            App app = findApp(appId);
+            if (app.isInProgress()) {
+                throw new InvalidAppStatusException();
+            }
+
+            boolean becomesActive = !ACTIVE_STATUSES.contains(app.getStatus());
+            if (becomesActive && appRepository.countByStatusIn(ACTIVE_STATUSES) >= MAX_ACTIVE_APPS) {
+                throw new AppLimitExceededException();
+            }
+            Integer newPort = app.needsPort() ? portAllocator.allocate(inUseOnHost) : null;
+            app.redeploy(newPort);
+            appRepository.saveAndFlush(app); 
+            eventPublisher.publishEvent(new DeployRequestedEvent(app.getId()));
+            return toResponse(app);
+        }, () -> {
+        });
+    }
+
+    private AppResponse withPortRetry(String operation,
+                                      Supplier<AppResponse> action,
+                                      Runnable onIntegrityViolation) {
+        for (int attempt = 1; attempt <= MAX_PORT_ATTEMPTS; attempt++) {
             try {
-                return transactionTemplate.execute(status -> save(request, repository, inUseOnHost));
+                return transactionTemplate.execute(status -> action.get());
             } catch (DataIntegrityViolationException e) {
-                if (appRepository.existsByName(request.name())) {
-                    throw new DuplicateAppNameException();
-                }
-                log.warn("[create] 포트 할당 충돌, 재시도 {}/{}", attempt, MAX_CREATE_ATTEMPTS);
+                onIntegrityViolation.run();
+                log.warn("[{}] 포트 할당 충돌, 재시도 {}/{}", operation, attempt, MAX_PORT_ATTEMPTS);
             }
         }
         throw new CustomException(ErrorCode.PORT_ALLOCATION_CONFLICT);
@@ -80,7 +114,7 @@ public class AppService {
                 request.internalPort(),
                 portAllocator.allocate(inUseOnHost)
         ));
-        eventPublisher.publishEvent(new AppCreatedEvent(app.getId()));
+        eventPublisher.publishEvent(new DeployRequestedEvent(app.getId()));
         return toResponse(app);
     }
 
