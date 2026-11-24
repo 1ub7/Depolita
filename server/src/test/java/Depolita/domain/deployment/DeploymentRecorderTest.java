@@ -12,12 +12,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -79,5 +82,26 @@ class DeploymentRecorderTest {
         recorder.succeed(7L);
 
         assertEquals(DeploymentStatus.SUCCEEDED, d.getStatus());
+    }
+
+    @Test
+    @DisplayName("서버 재시작 전에 시작해서 끝나지 않은 배포 이력은 FAILED로 바꾼다")
+    void failInterrupted() {
+        Deployment stuck = Deployment.start(1L, DeployTrigger.MANUAL, LocalDateTime.now().minusMinutes(5));
+        when(repository.findAllByStatusAndStartedAtBefore(eq(DeploymentStatus.IN_PROGRESS), any()))
+                .thenReturn(List.of(stuck));
+
+        recorder.failInterrupted();
+
+        assertEquals(DeploymentStatus.FAILED, stuck.getStatus());
+        assertEquals("서버 재시작으로 배포가 중단되었습니다.", stuck.getFailureReason());
+    }
+
+    @Test
+    @DisplayName("중단 이력 정리 중 예외가 나도 기동을 막지 않는다")
+    void failInterruptedFailureIsSwallowed() {
+        when(repository.findAllByStatusAndStartedAtBefore(any(), any())).thenThrow(new RuntimeException("DB down"));
+
+        assertDoesNotThrow(() -> recorder.failInterrupted());
     }
 }
