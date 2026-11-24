@@ -7,6 +7,7 @@ import Depolita.domain.webhook.support.WebhookSignatureVerifier;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,11 +29,7 @@ public class GithubWebhookController {
     private final GithubWebhookService webhookService;
     private final JsonMapper jsonMapper;
 
-    /**
-     * 서명은 본문 "원본 바이트"로 계산해야 하므로 객체로 바로 받지 않고 byte[] 로 받은 뒤 직접 파싱한다.
-     * (객체로 받았다가 다시 직렬화하면 공백·필드 순서가 달라져 서명이 맞지 않는다)
-     */
-    @PostMapping(PATH)
+    @PostMapping(path = PATH, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<WebhookResponse> receive(
             @RequestHeader(EVENT_HEADER) String event,
             @RequestHeader(value = WebhookSignatureVerifier.HEADER, required = false) String signature,
