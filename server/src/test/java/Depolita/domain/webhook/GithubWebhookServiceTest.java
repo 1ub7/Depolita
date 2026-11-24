@@ -108,4 +108,20 @@ class GithubWebhookServiceTest {
 
         verify(appService, never()).redeploy(anyLong(), any());
     }
+
+    @Test
+    @DisplayName("중지된 앱은 push 가 와도 되살리지 않는다")
+    void skipsStoppedApps() {
+        App stopped = app(1L);
+        stopped.startBuilding();
+        stopped.run("c-1");
+        stopped.stop();
+        when(appRepository.findAllByRepositoryUrl(CLONE_URL)).thenReturn(List.of(stopped, app(2L)));
+
+        WebhookResponse response = service.handlePush(push("refs/heads/main", CLONE_URL));
+
+        assertEquals(List.of(2L), response.redeployed());
+        assertEquals(List.of(1L), response.skipped());
+        verify(appService, never()).redeploy(1L, DeployTrigger.WEBHOOK);
+    }
 }

@@ -66,6 +66,6 @@ class WebhookSignatureVerifierTest {
     void notConfigured() throws Exception {
         WebhookSignatureVerifier unconfigured = new WebhookSignatureVerifier(new WebhookProperties(""));
 
-        assertFalse(unconfigured.verify(BODY, sign("", BODY)));
+        assertFalse(unconfigured.verify(BODY, sign(SECRET, BODY)));
     }
 }

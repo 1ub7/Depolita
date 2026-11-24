@@ -95,4 +95,20 @@ class GithubWebhookControllerTest {
                 "refs/heads/main", "abc123", false,
                 new GithubPushPayload.Repository("https://github.com/1ub7/demo.git", "main")));
     }
+
+    @Test
+    @DisplayName("Content type 이 JSON 이 아니면(GitHub 기본값인 폼) 415, 서비스는 호출하지 않는다")
+    void rejectsFormContentType() throws Exception {
+        String body = "payload=" + java.net.URLEncoder.encode(PUSH_BODY, StandardCharsets.UTF_8);
+
+        mockMvc.perform(post(GithubWebhookController.PATH)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .header(GithubWebhookController.EVENT_HEADER, "push")
+                        .header(WebhookSignatureVerifier.HEADER,
+                                WebhookSignatureVerifierTest.sign(SECRET, body.getBytes(StandardCharsets.UTF_8)))
+                        .content(body))
+                .andExpect(status().isUnsupportedMediaType());
+
+        verifyNoInteractions(webhookService);
+    }
 }
