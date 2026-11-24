@@ -54,6 +54,8 @@ public class DockerContainerRuntime implements ContainerRuntime {
 
         String containerId = null;
         try {
+            // 기동 후 네트워크가 지워졌으면(prune 등) 모든 배포가 실패하므로, 실행 직전에 한 번 더 확인한다
+            DockerAppNetworkInitializer.ensure(dockerClient);
             containerId = dockerClient.createContainerCmd(image)
                     .withName(name)
                     .withLabels(Map.of(APP_ID_LABEL, String.valueOf(appId)))
