@@ -4,6 +4,7 @@ import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppLogResponse;
 import Depolita.domain.app.dto.AppResponse;
 import Depolita.domain.app.service.AppService;
+import Depolita.domain.deployment.entity.DeployTrigger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -57,7 +58,7 @@ public class AppController {
     @PostMapping("/{appId}/redeploy")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public AppResponse redeploy(@PathVariable Long appId) {
-        return appService.redeploy(appId);
+        return appService.redeploy(appId, DeployTrigger.MANUAL);
     }
 
     @DeleteMapping("/{appId}")
