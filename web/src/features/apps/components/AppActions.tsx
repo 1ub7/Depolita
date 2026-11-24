@@ -19,13 +19,13 @@ const DIALOG: Record<
 > = {
   redeploy: {
     title: '재배포',
-    description:
-      '저장소의 최신 코드로 다시 빌드해서 실행합니다. 빌드가 끝날 때까지는 지금 버전이 계속 실행됩니다.',
+    description: '저장소의 최신 코드로 다시 빌드해서 실행합니다.',
     label: '재배포',
   },
   stop: {
     title: '중지',
-    description: '컨테이너를 중지하고 포트를 반납합니다. 재배포로 다시 실행할 수 있습니다.',
+    description:
+      '컨테이너를 중지하고 포트를 반납합니다. 재배포로 다시 실행할 수 있지만 접속 주소(포트)가 바뀔 수 있습니다.',
     label: '중지',
   },
   delete: {
@@ -33,6 +33,12 @@ const DIALOG: Record<
     description: '컨테이너와 이미지를 지우고 목록에서 제거합니다. 되돌릴 수 없습니다.',
     label: '삭제',
   },
+}
+
+function redeployNote(status: App['status']) {
+  return status === 'RUNNING'
+    ? '빌드하는 동안은 지금 버전이 계속 실행되지만, 빌드에 실패하면 지금 버전도 중지됩니다.'
+    : '포트가 새로 할당되므로 접속 주소가 바뀔 수 있습니다.'
 }
 
 export function AppActions({ app, size = 'sm', onDeleted }: Props) {
@@ -99,6 +105,7 @@ export function AppActions({ app, size = 'sm', onDeleted }: Props) {
         description={
           <>
             {dialog?.description}
+            {pending === 'redeploy' && ` ${redeployNote(app.status)}`}
             {error && <p className="text-danger-soft mt-3">{error.message}</p>}
           </>
         }
