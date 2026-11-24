@@ -31,3 +31,25 @@ export type AppLogs = {
   appId: number
   lines: string[]
 }
+
+/** server: Depolita.domain.deployment.entity.DeployTrigger */
+export type DeployTrigger = 'INITIAL' | 'MANUAL' | 'WEBHOOK'
+
+/** server: Depolita.domain.deployment.entity.DeploymentStatus */
+export type DeploymentStatus = 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED'
+
+/** server: DeploymentResponse */
+export type Deployment = {
+  id: number
+  trigger: DeployTrigger
+  /** 40자 커밋 SHA. 복제 전에 실패하면 null */
+  commitSha: string | null
+  status: DeploymentStatus
+  failureReason: string | null
+  cloneMs: number | null
+  buildMs: number | null
+  /** UTC ISO-8601 */
+  startedAt: string
+  /** UTC ISO-8601. 진행 중이면 null */
+  finishedAt: string | null
+}

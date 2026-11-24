@@ -34,3 +34,12 @@ export function formatDateTime(value: string): string {
 export function shortRepo(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\.git$/, '')
 }
+
+export function formatDuration(ms: number): string {
+  if (ms < 1_000) return `${ms}ms`
+  const totalSec = ms / 1_000
+  if (totalSec < 60) return `${totalSec.toFixed(1)}초`
+  const min = Math.floor(totalSec / 60)
+  const sec = Math.round(totalSec % 60)
+  return sec === 0 ? `${min}분` : `${min}분 ${sec}초`
+}

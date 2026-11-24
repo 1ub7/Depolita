@@ -1,5 +1,5 @@
 import { http } from '@/shared/api/http'
-import type { App, AppCreateRequest, AppLogs } from './model/types'
+import type { App, AppCreateRequest, AppLogs, Deployment } from './model/types'
 
 /** server: AppController (/api/apps) */
 export const appsApi = {
@@ -9,6 +9,10 @@ export const appsApi = {
 
   logs: (id: number, tail: number) =>
     http.get<AppLogs>(`/apps/${id}/logs`, { params: { tail } }).then((r) => r.data),
+
+  /** 최근 20건, 최신순 */
+  deployments: (id: number) =>
+    http.get<Deployment[]>(`/apps/${id}/deployments`).then((r) => r.data),
 
   /** 202 Accepted: 복제/빌드는 서버에서 비동기로 진행된다 */
   create: (body: AppCreateRequest) => http.post<App>('/apps', body).then((r) => r.data),

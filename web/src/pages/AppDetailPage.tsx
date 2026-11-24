@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router'
 import { AppActions } from '@/features/apps/components/AppActions'
+import { DeploymentHistory } from '@/features/apps/components/DeploymentHistory'
 import { LogViewer } from '@/features/apps/components/LogViewer'
 import { PipelineSteps } from '@/features/apps/components/PipelineSteps'
 import { StatusBadge } from '@/features/apps/components/StatusBadge'
@@ -92,6 +93,8 @@ function AppDetail({ appId }: { appId: number }) {
           ))}
         </dl>
       </Card>
+
+      <DeploymentHistory appId={app.id} repositoryUrl={app.repositoryUrl} />
 
       <LogViewer appId={app.id} />
     </>
