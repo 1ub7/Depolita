@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
@@ -62,5 +63,22 @@ class DockerContainerRuntimeTest {
         assertEquals(LogConfig.LoggingType.JSON_FILE, config.getLogConfig().getType());
         assertEquals("10m", config.getLogConfig().getConfig().get("max-size"));
         assertEquals("3", config.getLogConfig().getConfig().get("max-file"));
+    }
+
+    @Test
+    @DisplayName("앱 컨테이너는 권한 상승을 막고 프로세스 수를 제한한다")
+    void securityOptions() {
+        HostConfig config = DockerContainerRuntime.hostConfig(10001, ExposedPort.tcp(8080));
+
+        assertTrue(config.getSecurityOpts().contains("no-new-privileges"));
+        assertEquals(256L, config.getPidsLimit());
+    }
+
+    @Test
+    @DisplayName("앱 컨테이너는 앱 간 통신이 막힌 전용 네트워크에 붙는다")
+    void appNetwork() {
+        HostConfig config = DockerContainerRuntime.hostConfig(10001, ExposedPort.tcp(8080));
+
+        assertEquals(DockerContainerRuntime.APP_NETWORK, config.getNetworkMode());
     }
 }
