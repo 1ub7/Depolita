@@ -12,6 +12,7 @@ export const appKeys = {
   deployments: (id: number) => [...appKeys.all, 'deployments', id] as const,
 }
 
+// 배포가 진행 중이면 상태가 자주 바뀌므로 더 자주 물어본다
 const FAST_POLL = 2_000
 const SLOW_POLL = 5_000
 
@@ -78,6 +79,8 @@ export function useRedeployApp() {
     mutationFn: (id: number) => appsApi.redeploy(id),
     onSuccess: (app: App) => {
       queryClient.setQueryData(appKeys.detail(app.id), app)
+      // 새 배포 이력(진행 중)이 다음 폴링을 기다리지 않고 바로 보이도록
+      void queryClient.invalidateQueries({ queryKey: appKeys.deployments(app.id) })
       return queryClient.invalidateQueries({ queryKey: appKeys.list() })
     },
   })
