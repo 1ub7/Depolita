@@ -21,8 +21,9 @@ public enum AppStatus {
         return switch (this) {
             case CLONING -> next == BUILDING || next == FAILED;
             case BUILDING -> next == RUNNING || next == FAILED;
-            case RUNNING -> next == STOPPED || next == FAILED;
-            case STOPPED, FAILED -> false;
+            case RUNNING -> next == STOPPED || next == FAILED || next == CLONING;
+            // 중지·실패한 앱은 재배포(CLONING)로만 다시 시작할 수 있다
+            case STOPPED, FAILED -> next == CLONING;
         };
     }
 }
