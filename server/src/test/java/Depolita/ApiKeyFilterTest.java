@@ -74,4 +74,13 @@ class ApiKeyFilterTest {
         assertEquals(200, call("secret", "/actuator/health", null, chain).getStatus());
         assertNotNull(chain.getRequest());
     }
+
+    @Test
+    @DisplayName("GitHub Webhook 은 키 없이 통과 (서명 검증은 컨트롤러에서)")
+    void webhookIsPublic() throws Exception {
+        MockFilterChain chain = new MockFilterChain();
+
+        assertEquals(200, call("secret", "/api/webhooks/github", null, chain).getStatus());
+        assertNotNull(chain.getRequest());
+    }
 }
