@@ -38,6 +38,12 @@ public class DockerContainerRuntime implements ContainerRuntime {
     private static final long NANO_CPUS = 500_000_000L;
     private static final int MAX_LOG_TAIL = 1000;
     static final Map<String, String> LOG_OPTIONS = Map.of("max-size", "10m", "max-file", "3");
+    /** 앱 전용 네트워크. 앱 컨테이너끼리 통신할 수 없도록 icc=false 로 만든다 (DockerAppNetworkInitializer) */
+    public static final String APP_NETWORK = "depolita-apps";
+    /** setuid 바이너리 등으로 권한을 올리는 것을 막는다 */
+    static final String NO_NEW_PRIVILEGES = "no-new-privileges";
+    /** fork bomb 처럼 프로세스를 무한히 만들어 호스트를 멈추는 것을 막는다 */
+    static final long PIDS_LIMIT = 256L;
 
     private final DockerClient dockerClient;
 
@@ -48,6 +54,8 @@ public class DockerContainerRuntime implements ContainerRuntime {
 
         String containerId = null;
         try {
+            // 기동 후 네트워크가 지워졌으면(prune 등) 모든 배포가 실패하므로, 실행 직전에 한 번 더 확인한다
+            DockerAppNetworkInitializer.ensure(dockerClient);
             containerId = dockerClient.createContainerCmd(image)
                     .withName(name)
                     .withLabels(Map.of(APP_ID_LABEL, String.valueOf(appId)))
@@ -70,7 +78,10 @@ public class DockerContainerRuntime implements ContainerRuntime {
                 .withMemorySwap(MEMORY_LIMIT)
                 .withNanoCPUs(NANO_CPUS)
                 .withRestartPolicy(RestartPolicy.unlessStoppedRestart())
-                .withLogConfig(new LogConfig(LogConfig.LoggingType.JSON_FILE, LOG_OPTIONS));
+                .withLogConfig(new LogConfig(LogConfig.LoggingType.JSON_FILE, LOG_OPTIONS))
+                .withSecurityOpts(List.of(NO_NEW_PRIVILEGES))
+                .withPidsLimit(PIDS_LIMIT)
+                .withNetworkMode(APP_NETWORK);
     }
 
     @Override

@@ -75,8 +75,12 @@ resource "aws_instance" "this" {
     volume_size = var.disk_size_gb
   }
 
+  # IMDSv2 강제 + 토큰 응답이 한 홉만 가도록 제한한다.
+  # Docker 컨테이너는 브리지를 거쳐 한 홉이 더 늘어나므로, 배포된 앱이 EC2 메타데이터
+  # (나중에 붙일 IAM 역할 자격증명 포함)를 읽을 수 없다.
   metadata_options {
-    http_tokens = "required"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
   }
 
   tags = {
