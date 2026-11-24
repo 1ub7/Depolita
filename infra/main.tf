@@ -25,12 +25,14 @@ resource "aws_security_group" "this" {
     cidr_blocks = [var.ssh_allowed_cidr]
   }
 
+  # 80번은 dashboard_allowed_cidrs 로 대시보드를 잠가도 항상 열어둔다.
+  # Let's Encrypt HTTP-01 인증과 http→https 리다이렉트에만 쓰이고, 실제 대시보드는 443 에서만 응답한다.
   ingress {
-    description = "Dashboard (web)"
+    description = "HTTP for ACME challenge and HTTPS redirect (always open)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.dashboard_allowed_cidrs
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
