@@ -1,5 +1,6 @@
 package Depolita.global.security;
 
+import Depolita.domain.webhook.controller.GithubWebhookController;
 import Depolita.global.config.DepolitaProperties;
 import Depolita.global.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
@@ -23,7 +24,8 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/actuator/health",
             "/actuator/health/liveness",
-            "/actuator/health/readiness"
+            "/actuator/health/readiness",
+            GithubWebhookController.PATH
     );
 
     private final byte[] expectedKey;
