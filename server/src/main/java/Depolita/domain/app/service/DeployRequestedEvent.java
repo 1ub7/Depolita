@@ -1,4 +1,6 @@
 package Depolita.domain.app.service;
 
-public record DeployRequestedEvent(Long appId) {
+import Depolita.domain.deployment.entity.DeployTrigger;
+
+public record DeployRequestedEvent(Long appId, DeployTrigger trigger) {
 }

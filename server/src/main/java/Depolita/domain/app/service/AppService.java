@@ -14,6 +14,7 @@ import Depolita.domain.app.exception.InvalidAppStatusException;
 import Depolita.domain.app.port.ContainerRuntime;
 import Depolita.domain.app.port.ImageBuilder;
 import Depolita.domain.app.repository.AppRepository;
+import Depolita.domain.deployment.entity.DeployTrigger;
 import Depolita.global.config.DepolitaProperties;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
@@ -58,14 +59,20 @@ public class AppService {
         return withPortRetry("create",
                 () -> save(request, repository, inUseOnHost),
                 () -> {
+                    // UNIQUE 위반이 이름 때문이면 재시도해도 소용없으므로 바로 알려준다
                     if (appRepository.existsByName(request.name())) {
                         throw new DuplicateAppNameException();
                     }
                 });
     }
 
+    /**
+     * 같은 설정으로 다시 배포한다.
+     * - 실행 중인 앱: 같은 포트를 그대로 쓰고, 새 이미지가 빌드될 때까지 이전 버전이 계속 서비스된다.
+     * - 중지·실패한 앱: 반납했던 포트를 새로 할당받고, 활성 앱 개수 제한도 다시 검사한다.
+     */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public AppResponse redeploy(Long appId) {
+    public AppResponse redeploy(Long appId, DeployTrigger trigger) {
         Set<Integer> inUseOnHost = usedHostPorts();
 
         return withPortRetry("redeploy", () -> {
@@ -73,20 +80,24 @@ public class AppService {
             if (app.isInProgress()) {
                 throw new InvalidAppStatusException();
             }
-
+            // STOPPED/FAILED → CLONING 이면 활성 앱이 하나 늘어나므로 생성과 같은 제한을 건다
             boolean becomesActive = !ACTIVE_STATUSES.contains(app.getStatus());
             if (becomesActive && appRepository.countByStatusIn(ACTIVE_STATUSES) >= MAX_ACTIVE_APPS) {
                 throw new AppLimitExceededException();
             }
             Integer newPort = app.needsPort() ? portAllocator.allocate(inUseOnHost) : null;
             app.redeploy(newPort);
-            appRepository.saveAndFlush(app); 
-            eventPublisher.publishEvent(new DeployRequestedEvent(app.getId()));
+            appRepository.saveAndFlush(app); // 포트 UNIQUE 충돌을 이 트랜잭션 안에서 확인한다
+            eventPublisher.publishEvent(new DeployRequestedEvent(app.getId(), trigger));
             return toResponse(app);
         }, () -> {
         });
     }
 
+    /**
+     * 포트 UNIQUE 제약 충돌(동시에 같은 포트를 고른 경우) 시 최대 MAX_PORT_ATTEMPTS 번 다시 시도한다.
+     * onIntegrityViolation 은 재시도해도 소용없는 위반(예: 이름 중복)을 골라 예외로 바꾸는 데 쓴다.
+     */
     private AppResponse withPortRetry(String operation,
                                       Supplier<AppResponse> action,
                                       Runnable onIntegrityViolation) {
@@ -114,7 +125,7 @@ public class AppService {
                 request.internalPort(),
                 portAllocator.allocate(inUseOnHost)
         ));
-        eventPublisher.publishEvent(new DeployRequestedEvent(app.getId()));
+        eventPublisher.publishEvent(new DeployRequestedEvent(app.getId(), DeployTrigger.INITIAL));
         return toResponse(app);
     }
 

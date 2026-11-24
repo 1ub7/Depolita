@@ -9,6 +9,7 @@ export const appKeys = {
   list: () => [...appKeys.all, 'list'] as const,
   detail: (id: number) => [...appKeys.all, 'detail', id] as const,
   logs: (id: number, tail: number) => [...appKeys.all, 'logs', id, tail] as const,
+  deployments: (id: number) => [...appKeys.all, 'deployments', id] as const,
 }
 
 // 배포가 진행 중이면 상태가 자주 바뀌므로 더 자주 물어본다
@@ -43,6 +44,16 @@ export function useAppLogs(id: number, tail: number, autoRefresh: boolean) {
   })
 }
 
+export function useDeployments(id: number) {
+  return useQuery({
+    queryKey: appKeys.deployments(id),
+    queryFn: () => appsApi.deployments(id),
+    // 진행 중인 배포가 있으면 단계별 소요 시간이 채워지는 걸 빨리 보여준다
+    refetchInterval: (query) =>
+      query.state.data?.some((d) => d.status === 'IN_PROGRESS') ? FAST_POLL : SLOW_POLL,
+  })
+}
+
 export function useDeployApp() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -68,6 +79,8 @@ export function useRedeployApp() {
     mutationFn: (id: number) => appsApi.redeploy(id),
     onSuccess: (app: App) => {
       queryClient.setQueryData(appKeys.detail(app.id), app)
+      // 새 배포 이력(진행 중)이 다음 폴링을 기다리지 않고 바로 보이도록
+      void queryClient.invalidateQueries({ queryKey: appKeys.deployments(app.id) })
       return queryClient.invalidateQueries({ queryKey: appKeys.list() })
     },
   })

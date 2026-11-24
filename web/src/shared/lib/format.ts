@@ -34,3 +34,14 @@ export function formatDateTime(value: string): string {
 export function shortRepo(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\.git$/, '')
 }
+
+export function formatDuration(ms: number): string {
+  if (ms < 1_000) return `${ms}ms`
+  // 반올림을 먼저 하고 단위를 고른다. 그래야 59.99초가 "60.0초", 119.6초가 "1분 60초"로 나오지 않는다
+  const tenths = Math.round(ms / 100) / 10
+  if (tenths < 60) return `${tenths.toFixed(1)}초`
+  const totalSec = Math.round(ms / 1_000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return sec === 0 ? `${min}분` : `${min}분 ${sec}초`
+}
