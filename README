@@ -1,7 +1,9 @@
 # Depolita
+
 GitHub 저장소 주소를 입력하면 이미지를 빌드해서 컨테이너로 실행하고 접속 주소를 돌려주는 **미니 배포 플랫폼**입니다.
 
 ## 기술 스택
+
 | 구분 | 사용 기술 |
 | --- | --- |
 | Backend | Java 21, Spring Boot 4, Spring Data JPA, Flyway, docker-java, JGit |
@@ -11,6 +13,7 @@ GitHub 저장소 주소를 입력하면 이미지를 빌드해서 컨테이너�
 | CI/CD | GitHub Actions, GHCR, OIDC, SSM Run Command |
 
 ## 아키텍처
+
 ```mermaid
 flowchart LR
     U["사용자"] -->|HTTPS| C["Caddy"]
@@ -50,6 +53,7 @@ flowchart LR
 - **자동 롤백**: 새 이미지(태그 = 커밋 SHA)가 헬스체크를 통과하지 못하면 직전 버전으로 되돌린다.
 
 ## 객체지향 설계
+
 | 개념 | 적용한 곳 | 효과 |
 | --- | --- | --- |
 | 인터페이스 · 다형성 | `ContainerRuntime`, `ImageBuilder`, `SourceFetcher`, `HostPortChecker` | 서비스는 인터페이스에만 의존하고, Docker·JGit 구현체는 `infra` 에 둔다. 테스트에서는 `FakeContainerRuntime` 으로 바꿔 끼워 Docker 없이 검증한다 |
@@ -77,6 +81,7 @@ classDiagram
 ```
 
 ## 실행 방법
+
 ```bash
 cp .env.example .env               # DB 계정, ALLOWED_ACCOUNTS, DEPOLITA_API_KEY 입력
 docker compose up -d mysql
@@ -90,6 +95,7 @@ cd web && npm install && npm run dev   # 대시보드  http://localhost:5173
 운영 배포는 `infra/` 의 Terraform 으로 EC2 를 만든 뒤, `main` 에 머지하면 GitHub Actions 가 자동으로 배포합니다.
 
 ## 프로젝트 구조
+
 ```
 server/   Spring Boot API (배포 파이프라인, 재조정 루프)
 web/      React 대시보드
