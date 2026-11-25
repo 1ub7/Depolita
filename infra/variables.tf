@@ -64,3 +64,15 @@ variable "repo_url" {
   type        = string
   default     = "https://github.com/1ub7/Depolita.git"
 }
+
+variable "github_repository" {
+  description = "배포 역할을 받을 수 있는 GitHub 저장소 (owner/name). 이 저장소의 main 브랜치 워크플로만 허용"
+  type        = string
+  default     = "1ub7/Depolita"
+}
+
+variable "create_github_oidc_provider" {
+  description = "GitHub OIDC 공급자를 새로 만들지 여부. 계정에 이미 있으면 false"
+  type        = bool
+  default     = true
+}
