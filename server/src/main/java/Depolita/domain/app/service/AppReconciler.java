@@ -10,6 +10,7 @@ import Depolita.domain.app.port.ContainerRuntime.ManagedContainer;
 import Depolita.domain.app.port.ImageBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -30,16 +31,19 @@ public class AppReconciler {
     private final AppRepository appRepository;
     private final ContainerRuntime containerRuntime;
     private final ImageBuilder imageBuilder;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate tx;
     private final LocalDateTime startedAt;
 
     public AppReconciler(AppRepository appRepository,
                          ContainerRuntime containerRuntime,
                          ImageBuilder imageBuilder,
+                         ApplicationEventPublisher eventPublisher,
                          PlatformTransactionManager transactionManager) {
         this.appRepository = appRepository;
         this.containerRuntime = containerRuntime;
         this.imageBuilder = imageBuilder;
+        this.eventPublisher = eventPublisher;
         this.tx = new TransactionTemplate(transactionManager);
         this.startedAt = LocalDateTime.now();
     }
@@ -99,18 +103,20 @@ public class AppReconciler {
         if (reason == null) {
             return;
         }
-        Boolean failed = tx.execute(status -> appRepository.findById(appId)
+        // FAILED 로 바꾼 경우에만 앱 이름을 돌려받는다 (알림에 사용)
+        String crashedAppName = tx.execute(status -> appRepository.findById(appId)
                 .filter(app -> app.getStatus() == AppStatus.RUNNING)
                 .map(app -> {
                     app.fail(reason);
-                    return true;
+                    return app.getName();
                 })
-                .orElse(false));
-        if (Boolean.TRUE.equals(failed)) {
+                .orElse(null));
+        if (crashedAppName != null) {
             if (containerId != null) {
                 containerRuntime.remove(containerId);
             }
             log.warn("[reconcile] appId={} RUNNING → FAILED: {}", appId, reason);
+            eventPublisher.publishEvent(new AppCrashedEvent(appId, crashedAppName, reason));
         }
     }
 

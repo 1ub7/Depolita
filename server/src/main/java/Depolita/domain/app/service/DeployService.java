@@ -12,6 +12,7 @@ import Depolita.domain.deployment.service.DeploymentRecorder;
 import Depolita.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -34,6 +35,7 @@ public class DeployService {
     private final ImageBuilder imageBuilder;
     private final ContainerRuntime containerRuntime;
     private final DeploymentRecorder deploymentRecorder;
+    private final ApplicationEventPublisher eventPublisher;
     private final Executor deployExecutor;
     private final TransactionTemplate newTransaction;
 
@@ -42,6 +44,7 @@ public class DeployService {
                          ImageBuilder imageBuilder,
                          ContainerRuntime containerRuntime,
                          DeploymentRecorder deploymentRecorder,
+                         ApplicationEventPublisher eventPublisher,
                          @Qualifier("deployExecutor") Executor deployExecutor,
                          PlatformTransactionManager transactionManager) {
         this.appRepository = appRepository;
@@ -49,6 +52,7 @@ public class DeployService {
         this.imageBuilder = imageBuilder;
         this.containerRuntime = containerRuntime;
         this.deploymentRecorder = deploymentRecorder;
+        this.eventPublisher = eventPublisher;
         this.deployExecutor = deployExecutor;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -66,22 +70,26 @@ public class DeployService {
             deployExecutor.execute(() -> deploy(appId, deploymentId));
         } catch (RejectedExecutionException e) {
             log.warn("[deploy] appId={} 배포 대기열 초과로 거절", appId);
-            fail(appId, deploymentId, ErrorCode.DEPLOY_QUEUE_FULL.getMessage());
+            fail(appId, null, null, deploymentId, ErrorCode.DEPLOY_QUEUE_FULL.getMessage());
         }
     }
 
     private void deploy(Long appId, Long deploymentId) {
         Path workDir = null;
         String containerId = null;
+        String appName = null;
+        String commitSha = null;
 
         try {
             App app = appRepository.findById(appId)
                     .orElseThrow(AppNotFoundException::new);
+            appName = app.getName();
 
             // 1. Clone (생성·재배포 요청 시 상태가 이미 CLONING)
             long cloneStartedAt = System.nanoTime();
             FetchedSource source = sourceFetcher.fetch(app.getRepositoryUrl());
             workDir = source.dir();
+            commitSha = source.commitSha();
             deploymentRecorder.recordClone(deploymentId, source.commitSha(), elapsedMs(cloneStartedAt));
             if (!Files.exists(workDir.resolve("Dockerfile"))) {
                 throw new DockerfileNotFoundException();
@@ -110,13 +118,15 @@ public class DeployService {
             updateApp(appId, a -> a.run(runningId));
             deploymentRecorder.succeed(deploymentId);
             log.info("[deploy] appId={} RUNNING on port {}", appId, app.getAssignedPort());
+            eventPublisher.publishEvent(
+                    DeploymentFinishedEvent.succeeded(appId, appName, commitSha, app.getAssignedPort()));
 
         } catch (Exception e) {
             log.error("[deploy] appId={} FAILED", appId, e);
             if (containerId != null) {
                 removeQuietly(containerId);
             }
-            fail(appId, deploymentId, e.getMessage());
+            fail(appId, appName, commitSha, deploymentId, e.getMessage());
         } finally {
             sourceFetcher.cleanup(workDir);
         }
@@ -128,7 +138,7 @@ public class DeployService {
         );
     }
 
-    private void fail(Long appId, Long deploymentId, String reason) {
+    private void fail(Long appId, String appName, String commitSha, Long deploymentId, String reason) {
         String message = (reason == null || reason.isBlank()) ? "알 수 없는 오류" : reason;
         try {
             updateApp(appId, a -> a.fail(message));
@@ -136,6 +146,7 @@ public class DeployService {
             log.error("[deploy] appId={} 실패 상태 기록 불가", appId, ex);
         }
         deploymentRecorder.fail(deploymentId, message);
+        eventPublisher.publishEvent(DeploymentFinishedEvent.failed(appId, appName, commitSha, message));
     }
 
     private void removeQuietly(String containerId) {
