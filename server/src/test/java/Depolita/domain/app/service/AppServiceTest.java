@@ -4,6 +4,7 @@ import Depolita.domain.account.config.AllowedAccountProperties;
 import Depolita.domain.account.service.AccountValidator;
 import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppResponse;
+import Depolita.domain.app.dto.AppStatsResponse;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.exception.AppLimitExceededException;
@@ -293,6 +294,37 @@ class AppServiceTest {
 
         verify(appRepository, times(2)).saveAndFlush(any(App.class));
         assertTrue(secondTry.isInProgress());
+    }
+
+    // ---------- stats ----------
+
+    @Test
+    @DisplayName("실행 중인 앱의 CPU(소수 한 자리)와 메모리 사용량을 돌려준다")
+    void statsOfRunningApp() {
+        String containerId = containerRuntime.givenRunning(1L, 10001);
+        givenApp(1L, AppStatus.RUNNING, containerId);
+
+        AppStatsResponse stats = appService.getStats(1L);
+
+        assertEquals(12.3, stats.cpuPercent());
+        assertEquals(FakeContainerRuntime.SAMPLE_STATS.memoryUsageBytes(), stats.memoryUsageBytes());
+        assertEquals(FakeContainerRuntime.SAMPLE_STATS.memoryLimitBytes(), stats.memoryLimitBytes());
+    }
+
+    @Test
+    @DisplayName("실행 중이 아닌 앱은 사용량을 조회할 수 없다")
+    void statsOfNotRunningApp() {
+        givenApp(1L, AppStatus.BUILDING, null);
+
+        assertThrows(InvalidAppStatusException.class, () -> appService.getStats(1L));
+    }
+
+    @Test
+    @DisplayName("DB는 RUNNING인데 컨테이너가 사라졌으면 INVALID_APP_STATUS (재조정 루프가 곧 FAILED로 바꾼다)")
+    void statsWhenContainerGone() {
+        givenApp(1L, AppStatus.RUNNING, "already-removed");
+
+        assertThrows(InvalidAppStatusException.class, () -> appService.getStats(1L));
     }
 
     // ---------- delete ----------

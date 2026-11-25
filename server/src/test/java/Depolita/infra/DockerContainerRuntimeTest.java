@@ -113,4 +113,25 @@ class DockerContainerRuntimeTest {
         order.verify(createNetworkCmd).exec();
         order.verify(createCmd).exec();
     }
+
+    @Test
+    @DisplayName("CPU 사용률: 컨테이너 증가량 / 호스트 증가량 × 코어 수 × 100")
+    void cpuPercent() {
+        // 호스트 전체가 1초(1e9ns) 동안, 컨테이너가 0.25초를 썼고 코어가 2개 → 50%
+        assertEquals(50.0, DockerContainerRuntime.cpuPercent(250_000_000L, 1_000_000_000L, 2), 0.0001);
+    }
+
+    @Test
+    @DisplayName("이전 측정값이 없어 증가량이 0이거나 음수면 0%")
+    void cpuPercentWithoutDelta() {
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(0, 1_000_000_000L, 2));
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(100, 0, 2));
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(-5, 100, 2));
+    }
+
+    @Test
+    @DisplayName("컨테이너 ID가 없으면 조회하지 않고 empty")
+    void statsWithoutContainer() {
+        assertTrue(runtime.stats(null).isEmpty());
+    }
 }
