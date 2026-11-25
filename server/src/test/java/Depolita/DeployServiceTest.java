@@ -5,6 +5,7 @@ import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.repository.AppRepository;
 import Depolita.domain.app.service.DeployRequestedEvent;
 import Depolita.domain.app.service.DeployService;
+import Depolita.domain.app.service.DeploymentFinishedEvent;
 import Depolita.global.exception.CustomException;
 import Depolita.global.exception.ErrorCode;
 import Depolita.domain.app.port.ContainerRuntime;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
@@ -55,6 +57,7 @@ class DeployServiceTest {
     private final ImageBuilder imageBuilder = mock(ImageBuilder.class);
     private final ContainerRuntime containerRuntime = mock(ContainerRuntime.class);
     private final DeploymentRecorder recorder = mock(DeploymentRecorder.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
     private App app;
@@ -67,7 +70,8 @@ class DeployServiceTest {
     }
 
     private DeployService deployService(Executor executor) {
-        return new DeployService(appRepository, sourceFetcher, imageBuilder, containerRuntime, recorder, executor, txManager);
+        return new DeployService(appRepository, sourceFetcher, imageBuilder, containerRuntime, recorder, eventPublisher,
+                executor, txManager);
     }
 
     private FetchedSource source() {
@@ -99,6 +103,7 @@ class DeployServiceTest {
         verify(recorder).recordClone(eq(DEPLOYMENT_ID), eq(COMMIT_SHA), anyLong());
         verify(recorder).recordBuild(eq(DEPLOYMENT_ID), anyLong());
         verify(recorder).succeed(DEPLOYMENT_ID);
+        verify(eventPublisher).publishEvent(DeploymentFinishedEvent.succeeded(APP_ID, "my-app", COMMIT_SHA, 10001));
     }
 
     @Test
@@ -114,6 +119,8 @@ class DeployServiceTest {
         verifyNoInteractions(imageBuilder, containerRuntime);
         verify(recorder).fail(eq(DEPLOYMENT_ID), anyString());
         verify(recorder, never()).succeed(anyLong());
+        verify(eventPublisher).publishEvent(DeploymentFinishedEvent.failed(
+                APP_ID, "my-app", null, ErrorCode.GIT_CLONE_FAILED.getMessage()));
     }
 
     @Test

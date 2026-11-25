@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -39,6 +40,7 @@ class AppReconcilerTest {
     private final AppRepository appRepository = mock(AppRepository.class);
     private final ContainerRuntime containerRuntime = mock(ContainerRuntime.class);
     private final ImageBuilder imageBuilder = mock(ImageBuilder.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
     private AppReconciler reconciler;
@@ -49,7 +51,7 @@ class AppReconcilerTest {
         when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of());
         when(appRepository.findAll()).thenReturn(List.of());
         when(containerRuntime.listManaged()).thenReturn(List.of());
-        reconciler = new AppReconciler(appRepository, containerRuntime, imageBuilder, txManager);
+        reconciler = new AppReconciler(appRepository, containerRuntime, imageBuilder, eventPublisher, txManager);
     }
 
     private App runningApp(Long id, String containerId) {
@@ -86,6 +88,23 @@ class AppReconcilerTest {
         assertEquals(AppStatus.FAILED, app.getStatus());
         assertNull(app.getAssignedPort());
         verify(containerRuntime).remove("c-1");
+        verify(eventPublisher).publishEvent(any(AppCrashedEvent.class));
+    }
+
+    @Test
+    @DisplayName("OOM으로 죽으면 앱 이름과 원인을 담아 장애 이벤트를 발행한다")
+    void oomPublishesCrashEvent() {
+        App app = runningApp(1L, "c-1");
+        when(appRepository.findAllByStatusIn(anyCollection())).thenReturn(List.of(app));
+        when(appRepository.findById(1L)).thenReturn(Optional.of(app));
+        when(containerRuntime.inspect("c-1")).thenReturn(new ContainerInspection(ContainerStatus.EXITED, true, 0));
+
+        reconciler.reconcile();
+
+        ArgumentCaptor<AppCrashedEvent> event = ArgumentCaptor.forClass(AppCrashedEvent.class);
+        verify(eventPublisher).publishEvent(event.capture());
+        assertEquals("app-1", event.getValue().appName());
+        assertEquals(app.getFailureReason(), event.getValue().reason());
     }
 
     @Test
@@ -101,6 +120,7 @@ class AppReconcilerTest {
         reconciler.reconcile();
 
         assertEquals(AppStatus.STOPPED, latest.getStatus());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
         verify(containerRuntime, never()).remove("c-1");
     }
 
@@ -201,7 +221,7 @@ class AppReconcilerTest {
     @DisplayName("서버가 뜨기 전에 멈춘 배포만 FAILED로 바꾼다 (기동 직후 들어온 배포 요청은 건드리지 않음)")
     void failsOnlyDeploymentsInterruptedBeforeStartup() {
         LocalDateTime beforeCreate = LocalDateTime.now();
-        AppReconciler fresh = new AppReconciler(appRepository, containerRuntime, imageBuilder, txManager);
+        AppReconciler fresh = new AppReconciler(appRepository, containerRuntime, imageBuilder, eventPublisher, txManager);
         LocalDateTime afterCreate = LocalDateTime.now();
 
         App interrupted = App.create("old", "https://github.com/1ub7/demo.git", 8080, 10001);
