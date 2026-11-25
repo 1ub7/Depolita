@@ -30,6 +30,9 @@ services:
     restart: unless-stopped
 
   server:
+    # 운영 배포는 CI 가 GHCR 에 올린 이미지를 쓴다 (deploy/deploy.sh 가 커밋 SHA 를 태그로 넘김).
+    # build 도 남겨둬서 서버에서 직접 `up -d --build` 하는 수동 배포도 그대로 된다.
+    image: ${IMAGE_REGISTRY:-ghcr.io/1ub7}/depolita-server:${IMAGE_TAG:-latest}
     build: ./server
     logging: *default-logging
     network_mode: host
@@ -59,6 +62,7 @@ services:
     restart: unless-stopped
 
   web:
+    image: ${IMAGE_REGISTRY:-ghcr.io/1ub7}/depolita-web:${IMAGE_TAG:-latest}
     build: ./web
     logging: *default-logging
     environment:
