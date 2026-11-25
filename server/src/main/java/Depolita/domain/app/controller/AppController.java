@@ -3,6 +3,7 @@ package Depolita.domain.app.controller;
 import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppLogResponse;
 import Depolita.domain.app.dto.AppResponse;
+import Depolita.domain.app.dto.AppStatsResponse;
 import Depolita.domain.app.service.AppService;
 import Depolita.domain.deployment.entity.DeployTrigger;
 import jakarta.validation.Valid;
@@ -48,6 +49,11 @@ public class AppController {
     public AppLogResponse getLogs(@PathVariable Long appId,
                                   @RequestParam(defaultValue = "100") @Min(1) @Max(1000) int tail) {
         return appService.getLogs(appId, tail);
+    }
+
+    @GetMapping("/{appId}/stats")
+    public AppStatsResponse getStats(@PathVariable Long appId) {
+        return appService.getStats(appId);
     }
 
     @PostMapping("/{appId}/stop")

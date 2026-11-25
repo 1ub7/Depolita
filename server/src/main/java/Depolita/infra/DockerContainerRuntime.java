@@ -9,6 +9,7 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.ContainerPort;
+import com.github.dockerjava.api.model.CpuStatsConfig;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
@@ -16,14 +17,19 @@ import com.github.dockerjava.api.model.LogConfig;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.api.model.RestartPolicy;
+import com.github.dockerjava.api.model.Statistics;
+import com.github.dockerjava.core.InvocationBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -169,6 +175,53 @@ public class DockerContainerRuntime implements ContainerRuntime {
             Thread.currentThread().interrupt();
         }
         return logs.toString();
+    }
+
+    @Override
+    public Optional<ContainerStats> stats(String containerId) {
+        if (containerId == null) {
+            return Optional.empty();
+        }
+        try (InvocationBuilder.AsyncResultCallback<Statistics> callback = new InvocationBuilder.AsyncResultCallback<>()) {
+            // noStream: 한 번만 받는다. Docker 가 이전 측정값(precpu)을 같이 채워줘서 CPU 사용률을 계산할 수 있다
+            dockerClient.statsCmd(containerId).withNoStream(true).exec(callback);
+            Statistics stats = callback.awaitResult();
+            if (stats == null || stats.getCpuStats() == null || stats.getMemoryStats() == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new ContainerStats(
+                    cpuPercent(stats),
+                    orZero(stats.getMemoryStats().getUsage()),
+                    orZero(stats.getMemoryStats().getLimit())));
+        } catch (NotFoundException e) {
+            return Optional.empty();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static double cpuPercent(Statistics stats) {
+        CpuStatsConfig now = stats.getCpuStats();
+        CpuStatsConfig before = stats.getPreCpuStats();
+        if (before == null || now.getCpuUsage() == null || before.getCpuUsage() == null) {
+            return 0.0;
+        }
+        return cpuPercent(
+                orZero(now.getCpuUsage().getTotalUsage()) - orZero(before.getCpuUsage().getTotalUsage()),
+                orZero(now.getSystemCpuUsage()) - orZero(before.getSystemCpuUsage()),
+                orZero(now.getOnlineCpus()));
+    }
+
+    /** docker stats 와 같은 계산식: (컨테이너 CPU 증가량 / 호스트 전체 CPU 증가량) × 코어 수 × 100 */
+    static double cpuPercent(long containerDelta, long systemDelta, long onlineCpus) {
+        if (containerDelta <= 0 || systemDelta <= 0 || onlineCpus <= 0) {
+            return 0.0;
+        }
+        return (double) containerDelta / systemDelta * onlineCpus * 100.0;
+    }
+
+    private static long orZero(Long value) {
+        return value == null ? 0L : value;
     }
 
     private static Long parseAppId(Map<String, String> labels) {
