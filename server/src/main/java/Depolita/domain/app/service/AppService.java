@@ -5,6 +5,7 @@ import Depolita.domain.account.support.GithubRepository;
 import Depolita.domain.app.dto.AppCreateRequest;
 import Depolita.domain.app.dto.AppLogResponse;
 import Depolita.domain.app.dto.AppResponse;
+import Depolita.domain.app.dto.AppStatsResponse;
 import Depolita.domain.app.entity.App;
 import Depolita.domain.app.entity.AppStatus;
 import Depolita.domain.app.exception.AppLimitExceededException;
@@ -157,6 +158,18 @@ public class AppService {
         }
         String logs = containerRuntime.getLogs(app.getContainerId(), tail);
         return AppLogResponse.of(appId, logs.lines().toList());
+    }
+
+    /** 실행 중인 앱의 현재 CPU·메모리 사용량. 실행 중이 아니면 INVALID_APP_STATUS */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public AppStatsResponse getStats(Long appId) {
+        App app = findApp(appId);
+        if (app.getStatus() != AppStatus.RUNNING) {
+            throw new InvalidAppStatusException();
+        }
+        return containerRuntime.stats(app.getContainerId())
+                .map(stats -> AppStatsResponse.of(appId, stats))
+                .orElseThrow(InvalidAppStatusException::new);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

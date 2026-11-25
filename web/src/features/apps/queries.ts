@@ -10,6 +10,7 @@ export const appKeys = {
   detail: (id: number) => [...appKeys.all, 'detail', id] as const,
   logs: (id: number, tail: number) => [...appKeys.all, 'logs', id, tail] as const,
   deployments: (id: number) => [...appKeys.all, 'deployments', id] as const,
+  stats: (id: number) => [...appKeys.all, 'stats', id] as const,
 }
 
 // 배포가 진행 중이면 상태가 자주 바뀌므로 더 자주 물어본다
@@ -41,6 +42,18 @@ export function useAppLogs(id: number, tail: number, autoRefresh: boolean) {
     refetchInterval: autoRefresh ? 3_000 : false,
     // tail 을 바꿔도 이전 로그를 보여주다가 교체 → 화면 깜빡임 방지
     placeholderData: (prev) => prev,
+  })
+}
+
+export function useAppStats(id: number, enabled: boolean) {
+  return useQuery({
+    queryKey: appKeys.stats(id),
+    queryFn: () => appsApi.stats(id),
+    enabled,
+    refetchInterval: enabled ? SLOW_POLL : false,
+    // 막 중지됐을 때 409 가 몇 번 나도 화면이 깜빡이지 않게 이전 값을 유지한다
+    placeholderData: (prev) => prev,
+    retry: false,
   })
 }
 

@@ -1,5 +1,5 @@
 import { http } from '@/shared/api/http'
-import type { App, AppCreateRequest, AppLogs, Deployment } from './model/types'
+import type { App, AppCreateRequest, AppLogs, AppStats, Deployment } from './model/types'
 
 /** server: AppController (/api/apps) */
 export const appsApi = {
@@ -9,6 +9,9 @@ export const appsApi = {
 
   logs: (id: number, tail: number) =>
     http.get<AppLogs>(`/apps/${id}/logs`, { params: { tail } }).then((r) => r.data),
+
+  /** 실행 중인 앱만. 아니면 409 */
+  stats: (id: number) => http.get<AppStats>(`/apps/${id}/stats`).then((r) => r.data),
 
   /** 최근 20건, 최신순 */
   deployments: (id: number) =>

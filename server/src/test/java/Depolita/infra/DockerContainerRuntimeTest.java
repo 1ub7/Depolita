@@ -113,4 +113,38 @@ class DockerContainerRuntimeTest {
         order.verify(createNetworkCmd).exec();
         order.verify(createCmd).exec();
     }
+
+    @Test
+    @DisplayName("CPU 사용률: 컨테이너 증가량 / 호스트 증가량 × 코어 수 × 100")
+    void cpuPercent() {
+        // 호스트 전체가 1초(1e9ns) 동안, 컨테이너가 0.25초를 썼고 코어가 2개 → 50%
+        assertEquals(50.0, DockerContainerRuntime.cpuPercent(250_000_000L, 1_000_000_000L, 2), 0.0001);
+    }
+
+    @Test
+    @DisplayName("이전 측정값이 없어 증가량이 0이거나 음수면 0%")
+    void cpuPercentWithoutDelta() {
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(0, 1_000_000_000L, 2));
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(100, 0, 2));
+        assertEquals(0.0, DockerContainerRuntime.cpuPercent(-5, 100, 2));
+    }
+
+    @Test
+    @DisplayName("컨테이너 ID가 없으면 조회하지 않고 empty")
+    void statsWithoutContainer() {
+        assertTrue(runtime.stats(null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("메모리 사용량은 docker stats 처럼 회수 가능한 파일 캐시(inactive_file)를 뺀다")
+    void memoryUsageExcludesInactiveFileCache() {
+        long mb = 1024L * 1024;
+        // cgroup v2: inactive_file
+        assertEquals(100 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, 300 * mb));
+        // cgroup v1: total_inactive_file 우선
+        assertEquals(150 * mb, DockerContainerRuntime.memoryUsage(400 * mb, 250 * mb, 300 * mb));
+        // 정보가 없거나 이상한 값이면 usage 그대로
+        assertEquals(400 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, null));
+        assertEquals(400 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, 500 * mb));
+    }
 }

@@ -5,6 +5,7 @@ import Depolita.domain.app.port.ContainerRuntime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -78,5 +79,15 @@ public class FakeContainerRuntime implements ContainerRuntime {
     @Override
     public String getLogs(String containerId, int tail) {
         return containers.containsKey(containerId) ? "log of " + containerId : "";
+    }
+
+    public static final ContainerStats SAMPLE_STATS =
+            new ContainerStats(12.34, 100L * 1024 * 1024, 512L * 1024 * 1024);
+
+    @Override
+    public Optional<ContainerStats> stats(String containerId) {
+        return inspect(containerId).status() == ContainerStatus.RUNNING
+                ? Optional.of(SAMPLE_STATS)
+                : Optional.empty();
     }
 }

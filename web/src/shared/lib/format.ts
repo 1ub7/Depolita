@@ -45,3 +45,10 @@ export function formatDuration(ms: number): string {
   const sec = totalSec % 60
   return sec === 0 ? `${min}분` : `${min}분 ${sec}초`
 }
+
+/** 104_857_600 → "100 MB" */
+export function formatBytes(bytes: number): string {
+  const mb = bytes / 1024 / 1024
+  if (mb < 1024) return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`
+  return `${(mb / 1024).toFixed(2)} GB`
+}

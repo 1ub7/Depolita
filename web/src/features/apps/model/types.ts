@@ -53,3 +53,12 @@ export type Deployment = {
   /** UTC ISO-8601. 진행 중이면 null */
   finishedAt: string | null
 }
+
+/** server: AppStatsResponse */
+export type AppStats = {
+  appId: number
+  /** CPU 1개 = 100%. 앱 컨테이너는 0.5 CPU 로 제한되어 최대 약 50% */
+  cpuPercent: number
+  memoryUsageBytes: number
+  memoryLimitBytes: number
+}
