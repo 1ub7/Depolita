@@ -3,6 +3,7 @@ import { AppActions } from '@/features/apps/components/AppActions'
 import { DeploymentHistory } from '@/features/apps/components/DeploymentHistory'
 import { LogViewer } from '@/features/apps/components/LogViewer'
 import { PipelineSteps } from '@/features/apps/components/PipelineSteps'
+import { ResourceUsage } from '@/features/apps/components/ResourceUsage'
 import { StatusBadge } from '@/features/apps/components/StatusBadge'
 import { useApp } from '@/features/apps/queries'
 import { ApiError } from '@/shared/api/http'
@@ -82,6 +83,8 @@ function AppDetail({ appId }: { appId: number }) {
       </section>
 
       <PipelineSteps app={app} />
+
+      {app.status === 'RUNNING' && <ResourceUsage appId={app.id} />}
 
       <Card className="py-2">
         <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
