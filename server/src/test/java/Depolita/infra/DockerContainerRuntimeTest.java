@@ -134,4 +134,17 @@ class DockerContainerRuntimeTest {
     void statsWithoutContainer() {
         assertTrue(runtime.stats(null).isEmpty());
     }
+
+    @Test
+    @DisplayName("메모리 사용량은 docker stats 처럼 회수 가능한 파일 캐시(inactive_file)를 뺀다")
+    void memoryUsageExcludesInactiveFileCache() {
+        long mb = 1024L * 1024;
+        // cgroup v2: inactive_file
+        assertEquals(100 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, 300 * mb));
+        // cgroup v1: total_inactive_file 우선
+        assertEquals(150 * mb, DockerContainerRuntime.memoryUsage(400 * mb, 250 * mb, 300 * mb));
+        // 정보가 없거나 이상한 값이면 usage 그대로
+        assertEquals(400 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, null));
+        assertEquals(400 * mb, DockerContainerRuntime.memoryUsage(400 * mb, null, 500 * mb));
+    }
 }

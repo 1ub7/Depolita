@@ -14,10 +14,12 @@ import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.LogConfig;
+import com.github.dockerjava.api.model.MemoryStatsConfig;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.api.model.RestartPolicy;
 import com.github.dockerjava.api.model.Statistics;
+import com.github.dockerjava.api.model.StatsConfig;
 import com.github.dockerjava.core.InvocationBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -50,6 +52,7 @@ public class DockerContainerRuntime implements ContainerRuntime {
     static final String NO_NEW_PRIVILEGES = "no-new-privileges";
     /** fork bomb 처럼 프로세스를 무한히 만들어 호스트를 멈추는 것을 막는다 */
     static final long PIDS_LIMIT = 256L;
+    private static final long STATS_TIMEOUT_SECONDS = 5;
 
     private final DockerClient dockerClient;
 
@@ -185,15 +188,23 @@ public class DockerContainerRuntime implements ContainerRuntime {
         try (InvocationBuilder.AsyncResultCallback<Statistics> callback = new InvocationBuilder.AsyncResultCallback<>()) {
             // noStream: 한 번만 받는다. Docker 가 이전 측정값(precpu)을 같이 채워줘서 CPU 사용률을 계산할 수 있다
             dockerClient.statsCmd(containerId).withNoStream(true).exec(callback);
+            // Docker 가 응답하지 않으면 요청 스레드가 영원히 묶이므로 기다리는 시간을 제한한다
+            // (precpu 를 채우려고 Docker 가 두 번 측정하므로 보통 1~2초 걸린다)
+            if (!callback.awaitCompletion(STATS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                return Optional.empty();
+            }
             Statistics stats = callback.awaitResult();
             if (stats == null || stats.getCpuStats() == null || stats.getMemoryStats() == null) {
                 return Optional.empty();
             }
             return Optional.of(new ContainerStats(
                     cpuPercent(stats),
-                    orZero(stats.getMemoryStats().getUsage()),
+                    memoryUsage(stats.getMemoryStats()),
                     orZero(stats.getMemoryStats().getLimit())));
         } catch (NotFoundException e) {
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -210,6 +221,27 @@ public class DockerContainerRuntime implements ContainerRuntime {
                 orZero(now.getCpuUsage().getTotalUsage()) - orZero(before.getCpuUsage().getTotalUsage()),
                 orZero(now.getSystemCpuUsage()) - orZero(before.getSystemCpuUsage()),
                 orZero(now.getOnlineCpus()));
+    }
+
+    private static long memoryUsage(MemoryStatsConfig memory) {
+        StatsConfig detail = memory.getStats();
+        return memoryUsage(
+                orZero(memory.getUsage()),
+                detail == null ? null : detail.getTotalInactiveFile(),
+                detail == null ? null : detail.getInactiveFile());
+    }
+
+    /**
+     * docker stats 와 같은 계산식: 사용량에서 회수 가능한 파일 캐시(inactive_file)를 뺀다.
+     * usage 에는 페이지 캐시가 포함돼서, 파일을 읽기만 하는 앱도 512MB 에 가깝게 보이기 때문이다.
+     * cgroup v1 은 total_inactive_file, v2(Ubuntu 24.04 기본)는 inactive_file 을 쓴다.
+     */
+    static long memoryUsage(long usage, Long totalInactiveFile, Long inactiveFile) {
+        Long inactive = totalInactiveFile != null ? totalInactiveFile : inactiveFile;
+        if (inactive != null && inactive < usage) {
+            return usage - inactive;
+        }
+        return usage;
     }
 
     /** docker stats 와 같은 계산식: (컨테이너 CPU 증가량 / 호스트 전체 CPU 증가량) × 코어 수 × 100 */
