@@ -9,7 +9,7 @@ resource "aws_ssm_document" "deploy" {
   content = jsonencode({
     schemaVersion = "2.2"
     description   = "Deploy Depolita images tagged with the given commit SHA"
-    parameters    = {
+    parameters = {
       tag = {
         type           = "String"
         description    = "Commit SHA to deploy (40 hex chars)"
@@ -23,7 +23,7 @@ resource "aws_ssm_document" "deploy" {
         inputs = {
           timeoutSeconds   = "900"
           workingDirectory = "/home/ubuntu/Depolita"
-          runCommand       = [
+          runCommand = [
             "set -e",
             "sudo -u ubuntu git fetch --depth 1 origin {{ tag }}",
             "sudo -u ubuntu git checkout --force --detach FETCH_HEAD",

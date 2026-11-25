@@ -56,8 +56,8 @@ resource "aws_iam_role" "github_deploy" {
 # AWS-RunShellScript 같은 임의 명령 실행 문서는 허용하지 않는다.
 data "aws_iam_policy_document" "github_deploy" {
   statement {
-    sid       = "RunDeployDocumentOnDepolita"
-    actions   = ["ssm:SendCommand"]
+    sid     = "RunDeployDocumentOnDepolita"
+    actions = ["ssm:SendCommand"]
     resources = [
       aws_instance.this.arn,
       aws_ssm_document.deploy.arn,
@@ -65,7 +65,7 @@ data "aws_iam_policy_document" "github_deploy" {
   }
 
   statement {
-    sid     = "ReadCommandResult"
+    sid = "ReadCommandResult"
     actions = [
       "ssm:GetCommandInvocation",
       "ssm:ListCommandInvocations",
